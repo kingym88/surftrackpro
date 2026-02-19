@@ -1,0 +1,54 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Users: only the authenticated user can read/write their own document ──
+    match /users/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+
+      // Sessions subcollection
+      match /sessions/{sessionId} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
+
+      // Quiver (boards) subcollection
+      match /quiver/{boardId} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
+
+      // Cached forecasts subcollection (per-user)
+      match /forecasts/{spotId} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
+
+      // FCM tokens subcollection
+      match /fcmTokens/{tokenId} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
+    }
+
+    // ── Spots: publicly readable; authenticated users can add custom spots ──
+    match /spots/{spotId} {
+      allow read: if true;
+      allow create: if request.auth != null;
+      // Only the spot creator or admin can update/delete
+      allow update, delete: if request.auth != null &&
+        (resource.data.createdBy == request.auth.uid);
+    }
+
+    // ── Precomputed Forecasts: publicly readable ───────────────────────────────
+    // Writes are restricted to service accounts (backend precomputation job).
+    // In a production setup, use Firebase Admin SDK with a privileged service account.
+    // [NEEDS VERIFICATION] — For MVP, allow authenticated writes; restrict to service
+    // account before production launch.
+    match /precomputed_forecasts/{spotId} {
+      allow read: if true;
+      allow write: if request.auth != null; // TODO: restrict to service account
+
+      match /runs/{runId} {
+        allow read: if true;
+        allow write: if request.auth != null; // TODO: restrict to service account
+      }
+    }
+  }
+}
