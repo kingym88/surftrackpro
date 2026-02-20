@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Screen } from '@/types';
 import { useAuth } from '@/src/context/AuthContext';
 import { useToast } from '@/src/context/ToastContext';
+import { useApp } from '@/src/context/AppContext';
 import { portugalSpots } from '@/src/data/portugalSpots';
 
 interface SignUpScreenProps {
@@ -11,6 +12,7 @@ interface SignUpScreenProps {
 export const SignUpScreen: React.FC<SignUpScreenProps> = ({ onNavigate }) => {
   const { signUp, signInWithGoogle, authError, isLoadingAuth } = useAuth();
   const { addToast } = useToast();
+  const { setHomeSpotId: setAppHomeSpot } = useApp();
 
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
@@ -40,6 +42,7 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({ onNavigate }) => {
     setIsLoading(true);
     try {
       await signUp(email, password, displayName, homeSpotId, { min: waveMin, max: waveMax });
+      setAppHomeSpot(homeSpotId);
       addToast('Account created successfully!', 'success');
       onNavigate(Screen.HOME);
     } catch {

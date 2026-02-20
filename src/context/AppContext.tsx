@@ -6,6 +6,7 @@ import { Geolocation } from '@capacitor/geolocation';
 import { Capacitor } from '@capacitor/core';
 import { Preferences } from '@capacitor/preferences';
 import { fetchOpenMeteoForecast } from '@/src/services/openMeteo';
+import { getUserProfile } from '@/src/services/firestore';
 
 // ─── State shape ──────────────────────────────────────────────────────────────
 interface AppState {
@@ -140,9 +141,10 @@ const AppContext = createContext<AppContextType | null>(null);
 interface AppProviderProps {
   children: React.ReactNode;
   isGuest: boolean;
+  uid?: string;
 }
 
-export const AppProvider: React.FC<AppProviderProps> = ({ children, isGuest }) => {
+export const AppProvider: React.FC<AppProviderProps> = ({ children, isGuest, uid }) => {
   const [state, dispatch] = useReducer(reducer, initialState);
 
   // Load guest data or initial forecasts
@@ -192,15 +194,32 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, isGuest }) =
         // (This effect triggers when isGuest changes, we will handle fetching in a separate effect below depending on spots)
       }
       
-      // Restore homeSpotId preference
-      const homeKey = isGuest ? 'guest_homeSpotId' : 'user_homeSpotId';
-      const { value: homeId } = await Preferences.get({ key: homeKey });
-      if (homeId) {
-        dispatch({ type: 'SET_HOME_SPOT_ID', payload: homeId });
+      let setFromCloud = false;
+      if (!isGuest && uid) {
+        try {
+          const profile = await getUserProfile(uid);
+          if (profile?.homeSpotId) {
+            dispatch({ type: 'SET_HOME_SPOT_ID', payload: profile.homeSpotId });
+            dispatch({ type: 'SET_PREFERRED_WAVE_HEIGHT', payload: { min: profile.preferredWaveHeightMin, max: profile.preferredWaveHeightMax } });
+            setFromCloud = true;
+            await Preferences.set({ key: 'user_homeSpotId', value: profile.homeSpotId });
+          }
+        } catch (e) {
+          console.error('Failed to load user profile for preferences', e);
+        }
+      }
+
+      if (!setFromCloud) {
+        // Restore homeSpotId preference as fallback
+        const homeKey = isGuest ? 'guest_homeSpotId' : 'user_homeSpotId';
+        const { value: homeId } = await Preferences.get({ key: homeKey });
+        if (homeId) {
+          dispatch({ type: 'SET_HOME_SPOT_ID', payload: homeId });
+        }
       }
     }
     initApp();
-  }, [isGuest]);
+  }, [isGuest, uid]);
 
   // Handle saving homeSpotId preference
   useEffect(() => {

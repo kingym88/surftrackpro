@@ -42,7 +42,7 @@ const AuthLoadingSplash: React.FC = () => (
 
 // ─── Inner App (has access to context) ────────────────────────────────────────
 const AppInner: React.FC = () => {
-  const { isLoadingAuth, isGuest } = useAuth();
+  const { isLoadingAuth, isGuest, user } = useAuth();
   const [currentScreen, setCurrentScreen] = useState<Screen>(Screen.HOME);
   const [selectedSpot, setSelectedSpot] = useState<SurfSpot | null>(null);
   const [selectedSession, setSelectedSession] = useState<SessionLog | null>(null);
@@ -131,7 +131,7 @@ const AppInner: React.FC = () => {
   const showNav = !HIDE_NAV_SCREENS.includes(currentScreen);
 
   return (
-    <AppProvider isGuest={isGuest}>
+    <AppProvider isGuest={isGuest} uid={user?.uid}>
       <ToastProvider>
         <div className="max-w-md mx-auto min-h-screen relative overflow-hidden">
           {renderScreen()}
