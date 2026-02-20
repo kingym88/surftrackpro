@@ -9,7 +9,7 @@
  * - 49-168h: Consensus between GFS and Open-Meteo.
  */
 
-import * as admin from 'firebase-admin';
+import admin from 'firebase-admin';
 import { portugalSpots } from '../src/data/portugalSpots.js';
 
 const PROJECT_ID    = process.env.FIREBASE_PROJECT_ID;
