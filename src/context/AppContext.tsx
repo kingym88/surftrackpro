@@ -158,7 +158,20 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, isGuest }) =
         const { value: quiv } = await Preferences.get({ key: 'guest_temp_boards' });
         if (quiv) dispatch({ type: 'SET_QUIVER', payload: JSON.parse(quiv) });
       } else {
-        dispatch({ type: 'SET_SPOTS', payload: portugalSpots });
+        const normalizedSpots: SurfSpot[] = portugalSpots.map(s => ({
+          id: s.id,
+          name: s.name,
+          distance: '— km',
+          swellDirection: 'W',
+          height: '— m',
+          condition: 'FAIR',
+          image: '',
+          coordinates: { lat: s.latitude, lng: s.longitude },
+          region: s.region,
+          country: s.country,
+          breakProfile: s.breakProfile
+        }));
+        dispatch({ type: 'SET_SPOTS', payload: normalizedSpots });
         // Attempt geolocation if native
         let lat = 0, lng = 0;
         if (Capacitor.isNativePlatform()) {

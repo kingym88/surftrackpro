@@ -24,6 +24,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
   const [showSpotPicker, setShowSpotPicker] = useState(!homeSpotId);
   const [insight, setInsight] = useState<GeminiInsight | null>(null);
   const [loadingInsight, setLoadingInsight] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   useEffect(() => {
     setShowSpotPicker(!homeSpotId);
@@ -45,17 +47,21 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
     }
   }, [homeSpotId, homeForecast, isGuest, sessions, preferredWaveHeight, homeSpot]);
 
-  const handleSpotSelect = async (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const val = e.target.value;
-    if (!val) return;
-    setHomeSpotId(val);
+  const handleSpotSelect = async (spotId: string) => {
+    setHomeSpotId(spotId);
     if (isGuest) {
-      await Preferences.set({ key: 'guest_homeSpotId', value: val });
+      await Preferences.set({ key: 'guest_homeSpotId', value: spotId });
     } else if (user) {
-      await updateUserProfile(user.uid, { homeSpotId: val });
+      await updateUserProfile(user.uid, { homeSpotId: spotId });
     }
     setShowSpotPicker(false);
+    setSearchQuery('');
+    setShowSuggestions(false);
   };
+
+  const filteredSuggestions = searchQuery.length >= 1 
+    ? portugalSpots.filter(s => s.name.toLowerCase().includes(searchQuery.toLowerCase())).slice(0, 5)
+    : [];
 
   const getWindIcon = (dir: number) => {
     const dirs = ['north', 'north_east', 'east', 'south_east', 'south', 'south_west', 'west', 'north_west'];
@@ -95,17 +101,41 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
         {/* Set Your Home Break */}
         {showSpotPicker && (
           <section className="bg-surface rounded-xl p-6 border border-border">
-            <h2 className="text-lg font-bold text-text mb-2">Set Your Home Break</h2>
-            <select 
-              onChange={handleSpotSelect}
-              className="w-full bg-background text-text rounded p-3 mb-2 outline-none border border-border"
-              value={homeSpotId || ''}
-            >
-              <option value="">Select a spot...</option>
-              {portugalSpots.map(s => <option key={s.id} value={s.id}>{s.name} - {s.region}</option>)}
-            </select>
+            <h2 className="text-lg font-bold text-text mb-4">Set Your Home Break</h2>
+            <div className="relative">
+              <span className="material-icons-round absolute left-3 top-1/2 -translate-y-1/2 text-textMuted text-sm">search</span>
+              <input 
+                type="text"
+                placeholder="Search spots (e.g. Carcavelos)..."
+                className="w-full bg-background text-text rounded-xl py-3 pl-10 pr-4 outline-none border border-border focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setShowSuggestions(true);
+                }}
+                onFocus={() => setShowSuggestions(true)}
+              />
+              
+              {showSuggestions && filteredSuggestions.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-2 bg-surface border border-border rounded-xl shadow-xl z-50 overflow-hidden">
+                  {filteredSuggestions.map(s => (
+                    <div 
+                      key={s.id}
+                      onClick={() => handleSpotSelect(s.id)}
+                      className="p-4 hover:bg-primary/10 cursor-pointer flex justify-between items-center border-b border-border last:border-0"
+                    >
+                      <div>
+                        <p className="font-bold text-sm text-text">{s.name}</p>
+                        <p className="text-[10px] text-textMuted uppercase">{s.region}</p>
+                      </div>
+                      <span className="material-icons-round text-primary text-sm">arrow_forward_ios</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
             {homeSpotId && (
-              <button className="text-sm text-primary" onClick={() => setShowSpotPicker(false)}>Cancel</button>
+              <button className="text-sm text-textMuted mt-4 hover:text-text transition-colors" onClick={() => setShowSpotPicker(false)}>Cancel</button>
             )}
           </section>
         )}
