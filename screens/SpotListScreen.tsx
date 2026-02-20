@@ -6,6 +6,7 @@ import { SpotCardSkeleton } from '@/src/components/Skeletons';
 import { ErrorBoundary } from '@/src/components/ErrorBoundary';
 import { REGIONS, haversineKm } from '@/src/data/portugalSpots';
 import { Geolocation } from '@capacitor/geolocation';
+import { useUnits } from '@/src/hooks/useUnits';
 
 interface SpotListScreenProps {
   onNavigate: (screen: Screen, params?: any) => void;
@@ -13,6 +14,7 @@ interface SpotListScreenProps {
 
 export const SpotListScreen: React.FC<SpotListScreenProps> = ({ onNavigate }) => {
   const { spots, qualityScores, homeSpotId } = useApp();
+  const units = useUnits();
   const [searchQuery, setSearchQuery] = useState('');
   
   // View mode
@@ -51,9 +53,8 @@ export const SpotListScreen: React.FC<SpotListScreenProps> = ({ onNavigate }) =>
         referenceCoords.lat, referenceCoords.lng,
         spot.coordinates.lat, spot.coordinates.lng
       );
-      // convert km to miles loosely or just keep km. App uses "miles away" previously, let's stick to miles (0.621371)
-      const miles = dist * 0.621371;
-      return { ...spot, computedDistance: miles };
+      
+      return { ...spot, computedDistance: dist };
     });
   }, [spots, referenceCoords]);
 
@@ -119,7 +120,7 @@ export const SpotListScreen: React.FC<SpotListScreenProps> = ({ onNavigate }) =>
           <div className="flex-1 flex flex-col justify-between py-1">
             <div>
               <h3 className="text-lg font-bold mb-0.5 text-text group-hover:text-primary transition-colors">{spot.name}</h3>
-              <p className="text-xs text-textMuted">{spot.computedDistance.toFixed(1)} miles away</p>
+              <p className="text-xs text-textMuted">{units.geoDistance(spot.computedDistance)} away</p>
             </div>
             <div className="flex items-center justify-between mt-2">
               <div className="flex items-center gap-2">

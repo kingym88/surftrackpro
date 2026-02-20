@@ -18,6 +18,8 @@ import { SessionDetailScreen } from '@/screens/SessionDetailScreen';
 import { SignUpScreen } from '@/src/screens/SignUpScreen';
 import { SignInScreen } from '@/src/screens/SignInScreen';
 import { ForgotPasswordScreen } from '@/src/screens/ForgotPasswordScreen';
+import { EditProfileScreen } from '@/screens/EditProfileScreen';
+import { UserProfileProvider } from '@/src/context/UserProfileContext';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { AppProvider } from './src/context/AppContext';
 import { ToastProvider } from './src/context/ToastContext';
@@ -31,6 +33,7 @@ const HIDE_NAV_SCREENS: Screen[] = [
   Screen.SIGN_UP,
   Screen.SIGN_IN,
   Screen.FORGOT_PASSWORD,
+  Screen.EDIT_PROFILE,
 ];
 
 // ─── Auth Loading Splash ───────────────────────────────────────────────────────
@@ -100,6 +103,9 @@ const AppInner: React.FC = () => {
           <ProfileScreen onNavigate={navigate} />
         );
 
+      case Screen.EDIT_PROFILE:
+        return <EditProfileScreen onNavigate={navigate} />;
+
       case Screen.SESSION_DETAIL:
         return (
           <SessionDetailScreen
@@ -154,7 +160,9 @@ export default function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <AppInner />
+        <UserProfileProvider>
+          <AppInner />
+        </UserProfileProvider>
       </AuthProvider>
     </ThemeProvider>
   );

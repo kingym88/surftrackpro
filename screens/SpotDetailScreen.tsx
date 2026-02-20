@@ -7,6 +7,7 @@ import { GuestGate } from '@/src/components/GuestGate';
 import { TideMiniChart } from '@/src/components/TideMiniChart';
 import { getPrecomputedForecast } from '@/src/services/firestore';
 import { fetchOpenMeteoForecast } from '@/src/services/openMeteo';
+import { useUnits } from '@/src/hooks/useUnits';
 import { computeSwellQuality } from '@/src/services/swellQuality';
 import { getGeminiInsight } from '@/src/services/geminiInsight';
 import {
@@ -28,9 +29,11 @@ interface SpotDetailScreenProps {
 
 type Tab = 'FORECAST' | 'ANALYSIS' | 'CAMS' | 'LOGS';
 
-export const SpotDetailScreen: React.FC<SpotDetailScreenProps> = ({ spot, onNavigate, onBack }) => {
+export const SpotDetailScreen: React.FC<SpotDetailScreenProps> = ({ onNavigate, onBack, spot }) => {
   const [activeTab, setActiveTab] = useState<Tab>('FORECAST');
-  const { isGuest, sessions, preferredWaveHeight } = useApp();
+  const { isGuest, sessions, preferredWaveHeight, qualityScores, forecasts, tides, setForecast, setTides } = useApp();
+  const units = useUnits();
+  const { user } = useAuth();
   
   const [localForecasts, setLocalForecasts] = useState<ForecastSnapshot[]>([]);
   const [isStale, setIsStale] = useState(false);
@@ -257,12 +260,12 @@ export const SpotDetailScreen: React.FC<SpotDetailScreenProps> = ({ spot, onNavi
                       const RowContent = (
                         <tr key={i} className="hover:bg-background/50 transition-colors">
                           <td className="py-3 px-3 font-bold whitespace-nowrap">{time}</td>
-                          <td className="py-3 px-3 font-bold text-primary">{f.waveHeight.toFixed(1)}m</td>
+                          <td className="py-3 px-3 font-bold text-primary">{units.height(f.waveHeight)}</td>
                           <td className="py-3 px-3 text-textMuted">{f.wavePeriod.toFixed(0)}s</td>
                           <td className="py-3 px-3">
                             <span className="material-icons-round text-sm" style={{ rotate: `${f.swellDirection}deg` }}>north</span>
                           </td>
-                          <td className="py-3 px-3 font-bold">{f.windSpeed.toFixed(0)}km/h</td>
+                          <td className="py-3 px-3 font-bold">{units.speed(f.windSpeed)}</td>
                           <td className="py-3 px-3 text-textMuted">{f.windGust.toFixed(0)}</td>
                           <td className="py-3 px-3">
                             <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${qScore.label === 'EPIC' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : qScore.label === 'GOOD' ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' : qScore.label === 'FAIR' ? 'bg-amber-500/20 text-amber-400 border-amber-500/30' : 'bg-red-500/20 text-red-500 border-red-500/30'}`}>

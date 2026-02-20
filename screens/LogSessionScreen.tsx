@@ -6,6 +6,7 @@ import { useAuth } from '@/src/context/AuthContext';
 import { useToast } from '@/src/context/ToastContext';
 import { GuestGate } from '@/src/components/GuestGate';
 import { addSession as addSessionFirestore } from '@/src/services/firestore';
+import { useUnits } from '@/src/hooks/useUnits';
 
 interface LogSessionScreenProps {
   onNavigate: (screen: Screen, params?: any) => void;
@@ -15,6 +16,7 @@ export const LogSessionScreen: React.FC<LogSessionScreenProps> = ({ onNavigate }
   const { spots, quiver, addSession, forecasts, isGuest } = useApp();
   const { user } = useAuth();
   const { addToast } = useToast();
+  const units = useUnits();
   
   const [step, setStep] = useState(1);
   const [selectedSpotId, setSelectedSpotId] = useState<string>('');
@@ -254,7 +256,7 @@ export const LogSessionScreen: React.FC<LogSessionScreenProps> = ({ onNavigate }
 
              <section className="grid grid-cols-2 gap-4 mb-4">
                <div>
-                  <h2 className="text-[10px] font-bold uppercase tracking-widest text-textMuted mb-2">Top Speed (km/h)</h2>
+                  <h2 className="text-[10px] font-bold uppercase tracking-widest text-textMuted mb-2">Top Speed ({units.system === 'imperial' ? 'mph' : 'km/h'})</h2>
                   <input 
                     type="number" 
                     value={topSpeed}
@@ -264,7 +266,7 @@ export const LogSessionScreen: React.FC<LogSessionScreenProps> = ({ onNavigate }
                   />
                </div>
                <div>
-                  <h2 className="text-[10px] font-bold uppercase tracking-widest text-textMuted mb-2">Longest Ride (m)</h2>
+                  <h2 className="text-[10px] font-bold uppercase tracking-widest text-textMuted mb-2">Longest Ride ({units.system === 'imperial' ? 'yd' : 'm'})</h2>
                   <input 
                     type="number" 
                     value={longestRide}

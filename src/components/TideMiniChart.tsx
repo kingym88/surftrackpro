@@ -1,6 +1,7 @@
 import React from 'react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ReferenceLine, ResponsiveContainer } from 'recharts';
 import type { TidePoint } from '@/types';
+import { useUnits } from '@/src/hooks/useUnits';
 
 interface TideMiniChartProps {
   tides: TidePoint[];
@@ -17,6 +18,8 @@ export const TideMiniChart: React.FC<TideMiniChartProps> = ({
   tides,
   isGuest = false,
 }) => {
+  const units = useUnits();
+
   if (!tides || tides.length === 0) {
     return <div className="h-24 bg-surface rounded-xl animate-pulse" />;
   }
@@ -66,14 +69,10 @@ export const TideMiniChart: React.FC<TideMiniChartProps> = ({
               width={30}
             />
             <Tooltip
-              contentStyle={{
-                background: '#0f172a',
-                border: '1px solid rgba(255,255,255,0.1)',
-                borderRadius: '8px',
-                fontSize: '11px',
-                color: '#e2e8f0',
-              }}
-              formatter={(val: number) => [`${val.toFixed(2)}m`, 'Height']}
+              contentStyle={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)', borderRadius: '8px', padding: '4px 8px' }}
+              itemStyle={{ color: 'var(--color-text)', fontSize: '10px', fontWeight: 'bold' }}
+              labelStyle={{ display: 'none' }}
+              formatter={(val: number) => [units.height(val), 'Height']}
             />
             {/* Hi/Lo reference lines */}
             {hiLoPoints.map((t, i) => (
@@ -83,7 +82,7 @@ export const TideMiniChart: React.FC<TideMiniChartProps> = ({
                 stroke={t.type === 'HIGH' ? '#22d3ee' : '#334155'}
                 strokeDasharray="3 3"
                 label={{
-                  value: t.type === 'HIGH' ? `▲${t.height.toFixed(1)}m` : `▼${t.height.toFixed(1)}m`,
+                  value: t.type === 'HIGH' ? `▲${units.height(t.height)}` : `▼${units.height(t.height)}`,
                   position: t.type === 'HIGH' ? 'top' : 'bottom',
                   fill: t.type === 'HIGH' ? '#22d3ee' : '#64748b',
                   fontSize: 8,

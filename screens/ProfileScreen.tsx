@@ -3,6 +3,8 @@ import { Screen } from '../types';
 import { useAuth } from '@/src/context/AuthContext';
 import { useApp } from '@/src/context/AppContext';
 import { useTheme } from '@/src/context/ThemeContext';
+import { useUserProfile } from '@/src/context/UserProfileContext';
+import { useUnits } from '@/src/hooks/useUnits';
 
 interface ProfileScreenProps {
   onNavigate: (screen: Screen, params?: any) => void;
@@ -12,6 +14,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate }) => {
   const { user, signOut } = useAuth();
   const { sessions, quiver, isGuest } = useApp();
   const { theme, toggleTheme } = useTheme();
+  const { profile, updateProfile } = useUserProfile();
+  const units = useUnits();
 
   // Aggregate user stats
   const stats = useMemo(() => {
@@ -67,7 +71,13 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate }) => {
       .sort((a,b) => b.count - a.count)
       .slice(0, 3); // Top 3
 
-    return { totalSessions, lastSurfDays, topSpotName, topSpotCount, boardUsage, wavesLogged, spotsVisited };
+    let avgHeight = 0;
+    if (totalSessions > 0) {
+       const hts = sessions.map(s => parseFloat(s.height)).filter(h => !isNaN(h));
+       if (hts.length > 0) avgHeight = hts.reduce((a,b) => a+b, 0) / hts.length;
+    }
+
+    return { totalSessions, lastSurfDays, topSpotName, topSpotCount, boardUsage, wavesLogged, spotsVisited, avgHeight };
   }, [sessions, quiver, isGuest]);
 
 
@@ -106,14 +116,14 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate }) => {
             </h1>
             <div className="flex items-center text-textMuted text-sm mt-0.5 font-medium">
               <span className="material-icons-round text-xs mr-1 text-primary">location_on</span>
-              {user ? 'Lisbon, PT' : 'Local Break'}
+              {user ? (profile?.location ?? 'Lisbon, PT') : 'Local Break'}
             </div>
             {isGuest ? (
               <button onClick={() => onNavigate(Screen.SIGN_UP)} className="mt-2 text-xs font-bold uppercase tracking-wider bg-primary text-white px-4 py-2 rounded-full border border-primary hover:bg-primary/80 transition-colors shadow-sm">
                 Create your profile
               </button>
             ) : (
-              <button className="mt-2 text-xs font-bold uppercase tracking-wider bg-surface text-text px-3 py-1.5 rounded-full border border-border hover:bg-border transition-colors shadow-sm">
+              <button onClick={() => onNavigate(Screen.EDIT_PROFILE)} className="mt-2 text-xs font-bold uppercase tracking-wider bg-surface text-text px-3 py-1.5 rounded-full border border-border hover:bg-border transition-colors shadow-sm">
                 Edit Profile
               </button>
             )}
@@ -159,7 +169,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate }) => {
               <span className="material-icons-round text-accent2 text-lg">water</span>
             </div>
             <p className="text-[10px] uppercase font-bold tracking-wider text-textMuted mb-0.5">Avg Height</p>
-            <h3 className="text-base font-bold text-text">{isGuest ? '--' : '3 - 5 FT'}</h3>
+            <h3 className="text-base font-bold text-text">
+              {isGuest || stats.avgHeight === 0 ? '--' : units.heightRange(Math.max(0, stats.avgHeight - 0.2), stats.avgHeight + 0.3)}
+            </h3>
             {!isGuest && (
               <div className="flex items-center space-x-1 mt-1">
                 <div className="h-1.5 w-full bg-background rounded-full overflow-hidden border border-border">
@@ -259,7 +271,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate }) => {
                       {session.conditionsSnapshot && (
                          <div className="flex items-center space-x-3 mt-1.5">
                             <span className="text-xs text-textMuted font-bold flex items-center">
-                               {session.conditionsSnapshot.waveHeight.toFixed(1)}ft @ {session.conditionsSnapshot.wavePeriod}s
+                               {units.height(session.conditionsSnapshot.waveHeight)} @ {session.conditionsSnapshot.wavePeriod}s
                             </span>
                          </div>
                       )}
@@ -285,6 +297,26 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate }) => {
                >
                   <div className={`w-4 h-4 rounded-full bg-white transition-transform ${theme === 'dark' ? 'translate-x-6' : 'translate-x-0'}`}></div>
                </button>
+            </div>
+            <div className="p-4 flex justify-between items-center border-b border-border">
+               <div className="flex items-center gap-3">
+                  <span className="material-icons-round text-textMuted">straighten</span>
+                  <span className="text-sm font-bold text-text">Units</span>
+               </div>
+               <div className="flex gap-2">
+                 <button 
+                   onClick={() => updateProfile({ unitSystem: 'imperial' })}
+                   className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase transition-colors ${units.system === 'imperial' ? 'bg-primary text-white' : 'bg-background text-textMuted border border-border'}`}
+                 >
+                   Imperial
+                 </button>
+                 <button 
+                   onClick={() => updateProfile({ unitSystem: 'metric' })}
+                   className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase transition-colors ${units.system === 'metric' ? 'bg-primary text-white' : 'bg-background text-textMuted border border-border'}`}
+                 >
+                   Metric
+                 </button>
+               </div>
             </div>
          </div>
       </section>

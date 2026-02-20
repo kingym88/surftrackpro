@@ -12,6 +12,7 @@ import { ForecastStrip } from '@/src/components/ForecastStrip';
 import { TideMiniChart } from '@/src/components/TideMiniChart';
 import { getGeminiInsight } from '@/src/services/geminiInsight';
 import * as SunCalc from 'suncalc';
+import { useUnits } from '@/src/hooks/useUnits';
 import type { GeminiInsight } from '@/types';
 
 interface HomeScreenProps {
@@ -21,6 +22,7 @@ interface HomeScreenProps {
 export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
   const { homeSpotId, setHomeSpotId, forecasts, isLoadingForecast, forecastError, isGuest, tides, preferredWaveHeight, nearbySpotIds, sessions } = useApp();
   const { user } = useAuth();
+  const units = useUnits();
 
   const [showSpotPicker, setShowSpotPicker] = useState(!homeSpotId);
   const [insight, setInsight] = useState<GeminiInsight | null>(null);
@@ -191,7 +193,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
                   <div className="flex justify-between items-start mb-6">
                     <div>
                       <span className="bg-white/20 px-3 py-1 rounded-full text-xs font-semibold backdrop-blur-md">LIVE FORECAST</span>
-                      <h2 className="text-4xl font-bold mt-4 tracking-tight">{(currentSnap?.waveHeight ?? 0).toFixed(1)}<span className="text-xl font-normal opacity-80">m</span></h2>
+                      <h2 className="text-4xl font-bold mt-4 tracking-tight">{units.height(currentSnap?.waveHeight ?? 0)}</h2>
                       <p className="text-white/80 font-medium">{qualityScore?.label || 'FAIR'}</p>
                     </div>
                     <div className="text-right">
@@ -206,12 +208,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
                     </div>
                     <div className="flex flex-col items-center">
                       <span className="material-icons-round text-white/60 text-lg mb-1">air</span>
-                      <p className="text-sm font-bold">{(currentSnap?.windSpeed ?? 0).toFixed(0)}km/h <span className="material-icons-round text-[10px]">{getWindIcon(currentSnap?.windDirection ?? 0)}</span></p>
+                      <p className="text-sm font-bold">{units.speed(currentSnap?.windSpeed ?? 0)} <span className="material-icons-round text-[10px]">{getWindIcon(currentSnap?.windDirection ?? 0)}</span></p>
                       <p className="text-[10px] uppercase opacity-60">{computeWindLabel(currentSnap?.windDirection ?? 0)}</p>
                     </div>
                     <div className="flex flex-col items-center">
                       <span className="material-icons-round text-white/60 text-lg mb-1">water_drop</span>
-                      <p className="text-sm font-bold">{(currentSnap?.airTemp ?? 0).toFixed(0)}°C</p>
+                      <p className="text-sm font-bold">{units.temp(currentSnap?.airTemp ?? 0)}</p>
                       <p className="text-[10px] uppercase opacity-60">Water Temp</p>
                     </div>
                   </div>
@@ -273,7 +275,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
              : '--';
            
            const tideHeightText = upcomingTide 
-             ? upcomingTide.height.toFixed(1) 
+             ? units.height(upcomingTide.height) 
              : '--';
            
            const tideLabel = upcomingTide?.type === 'HIGH' ? 'High' : 'Low';
@@ -300,7 +302,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
                   <span className="material-icons-round text-sm text-slate-500">{tideIcon}</span>
                 </div>
                 <h5 className="text-lg font-bold">{tideLabel} <span className="text-xs font-normal text-slate-500">at {tideTimeText}</span></h5>
-                <p className="text-xs text-slate-400 mt-1">{tideHeightText}m {tideTrendLabel}</p>
+                <p className="text-xs text-slate-400 mt-1">{tideHeightText} {tideTrendLabel}</p>
               </div>
               <div className="bg-white/5 rounded-xl p-4 border border-white/5">
                 <div className="flex items-center justify-between mb-2">
@@ -353,7 +355,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
                     ) : (
                       <div className="bg-slate-500/20 text-slate-400 text-[10px] font-bold px-2 py-1 rounded uppercase mb-1 inline-block text-center border border-slate-700">LDG</div>
                     )}
-                    <p className="text-sm font-bold text-slate-200">{ncast ? `${ncast.waveHeight.toFixed(1)}m` : '--'}</p>
+                    <p className="text-sm font-bold text-slate-200">{ncast ? units.height(ncast.waveHeight) : '--'}</p>
                   </div>
                 </div>
               );

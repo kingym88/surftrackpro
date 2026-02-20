@@ -3,6 +3,7 @@ import { useApp } from '@/src/context/AppContext';
 import { getGeminiInsight } from '@/src/services/geminiInsight';
 import { GuestGate } from '@/src/components/GuestGate';
 import { PORTUGAL_SPOTS } from '@/src/data/portugalSpots';
+import { useUnits } from '@/src/hooks/useUnits';
 import {
   LineChart,
   Line,
@@ -22,6 +23,7 @@ export const SkillProgressionScreen: React.FC<SkillProgressionScreenProps> = ({ 
   const [timeframe, setTimeframe] = useState<'30' | '90' | 'ALL'>('30');
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
   const [isLoadingAnalysis, setIsLoadingAnalysis] = useState(false);
+  const units = useUnits();
 
   const homeSpot = useMemo(() => PORTUGAL_SPOTS.find(s => s.id === homeSpotId), [homeSpotId]);
 
@@ -164,7 +166,9 @@ export const SkillProgressionScreen: React.FC<SkillProgressionScreenProps> = ({ 
             </div>
             <div className="bg-surface border border-border p-4 rounded-xl shadow-sm">
               <span className="text-[10px] font-bold uppercase tracking-widest text-textMuted block mb-1">Top Speed</span>
-              <span className="text-2xl font-black text-text">{stats.topSpeed}<span className="text-xs font-medium text-textMuted ml-1">km/h</span></span>
+              <span className="text-2xl font-black text-text">
+                {stats.topSpeed !== '--' ? units.speed(stats.topSpeed as number) : '--'}
+              </span>
             </div>
             <div className="bg-surface border border-border p-4 rounded-xl shadow-sm">
               <span className="text-[10px] font-bold uppercase tracking-widest text-textMuted block mb-1">Best Score</span>

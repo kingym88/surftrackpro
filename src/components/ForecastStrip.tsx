@@ -2,6 +2,7 @@ import React from 'react';
 import type { ForecastSnapshot, SwellQualityScore } from '@/types';
 import { computeSwellQuality } from '@/src/services/swellQuality';
 import { GuestGate } from './GuestGate';
+import { useUnits } from '@/src/hooks/useUnits';
 
 // Default break profile for Porto/Peniche area
 const DEFAULT_BREAK_PROFILE = {
@@ -55,6 +56,8 @@ export const ForecastStrip: React.FC<ForecastStripProps> = ({
   isGuest = false,
   onNavigate,
 }) => {
+  const units = useUnits();
+
   if (!forecasts || forecasts.length === 0) {
     return (
       <div className="h-24 bg-surface rounded-xl animate-pulse" />
@@ -109,7 +112,7 @@ export const ForecastStrip: React.FC<ForecastStripProps> = ({
                       {day.score.label}
                     </div>
                     <p className="text-xs font-bold text-text">
-                      {day.snapshots[0]?.waveHeight?.toFixed(1)}m
+                      {units.height(day.snapshots[0]?.waveHeight || 0)}
                     </p>
                   </div>
                   <div className="absolute inset-0 flex items-center justify-center">
@@ -133,7 +136,7 @@ export const ForecastStrip: React.FC<ForecastStripProps> = ({
                 {day.score.label}
               </div>
               <p className="text-sm font-bold text-text">
-                {repSnap?.waveHeight?.toFixed(1)}m
+                {units.height(repSnap?.waveHeight || 0)}
               </p>
               <p className="text-[10px] text-slate-500">
                 {repSnap?.wavePeriod?.toFixed(0)}s

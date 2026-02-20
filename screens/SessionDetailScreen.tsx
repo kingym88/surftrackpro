@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Screen } from '../types';
 import type { SessionLog, ForecastSnapshot } from '../types';
 import { useApp } from '@/src/context/AppContext';
+import { useUnits } from '@/src/hooks/useUnits';
 import { GuestGate } from '@/src/components/GuestGate';
 import { getGeminiInsight } from '@/src/services/geminiInsight';
 import { fetchOpenMeteoForecast } from '@/src/services/openMeteo';
@@ -13,6 +14,7 @@ interface SessionDetailScreenProps {
 
 export const SessionDetailScreen: React.FC<SessionDetailScreenProps> = ({ session, onBack }) => {
   const { spots, quiver, forecasts, preferredWaveHeight } = useApp();
+  const units = useUnits();
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
   const [isLoadingAnalysis, setIsLoadingAnalysis] = useState(false);
   const [nearestForecast, setNearestForecast] = useState<ForecastSnapshot | null>(null);
@@ -84,7 +86,7 @@ export const SessionDetailScreen: React.FC<SessionDetailScreenProps> = ({ sessio
   if (!isNaN(loggedHeight) && nearestForecast) {
      const delta = loggedHeight - nearestForecast.waveHeight;
      isAccurate = Math.abs(delta) <= 0.2;
-     deltaIndicator = `${delta > 0 ? '+' : ''}${delta.toFixed(1)}m`;
+     deltaIndicator = `${delta > 0 ? '+' : ''}${units.height(delta)}`;
   }
 
   return (
@@ -122,7 +124,7 @@ export const SessionDetailScreen: React.FC<SessionDetailScreenProps> = ({ sessio
                  <div className="bg-background rounded-xl p-3 border border-border">
                     <p className="text-[10px] font-bold text-slate-500 uppercase mb-1">Forecast Wave</p>
                     <div className="flex items-baseline gap-1">
-                       <span className="text-xl font-black text-primary">{nearestForecast.waveHeight.toFixed(1)}m</span>
+                       <span className="text-xl font-black text-primary">{units.height(nearestForecast.waveHeight)}</span>
                        <span className="text-[10px] font-bold text-textMuted">@ {nearestForecast.wavePeriod}s</span>
                     </div>
                     {deltaIndicator && (
@@ -134,7 +136,7 @@ export const SessionDetailScreen: React.FC<SessionDetailScreenProps> = ({ sessio
                  <div className="bg-background rounded-xl p-3 border border-border">
                     <p className="text-[10px] font-bold text-slate-500 uppercase mb-1">Wind & Swell Dir</p>
                     <div className="flex flex-col gap-1">
-                       <span className="text-sm font-black text-text">{nearestForecast.windSpeed.toFixed(0)}km/h <span className="material-icons-round text-[10px]" style={{rotate: `${nearestForecast.windDirection}deg`}}>north</span></span>
+                       <span className="text-sm font-black text-text">{units.speed(nearestForecast.windSpeed)} <span className="material-icons-round text-[10px]" style={{rotate: `${nearestForecast.windDirection}deg`}}>north</span></span>
                        <span className="text-[10px] font-bold text-textMuted">Swell {nearestForecast.swellDirection}°</span>
                     </div>
                  </div>

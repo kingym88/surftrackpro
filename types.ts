@@ -11,6 +11,7 @@ export enum Screen {
   COMMUNITY = 'COMMUNITY',
   ADD_BOARD = 'ADD_BOARD',
   SESSION_DETAIL = 'SESSION_DETAIL',
+  EDIT_PROFILE = 'EDIT_PROFILE',
   // Auth screens
   SIGN_UP = 'SIGN_UP',
   SIGN_IN = 'SIGN_IN',
@@ -71,6 +72,17 @@ export interface Board {
   boardType: 'shortboard' | 'longboard' | 'fish' | 'funboard' | 'gun' | 'foilboard';
   photo?: string;
   uid?: string;
+}
+
+// ─── User Profile ──────────────────────────────────────────────────────────────
+export interface UserProfile {
+  uid: string;
+  displayName: string;
+  location: string;
+  skillLevel: 'beginner' | 'intermediate' | 'advanced' | 'pro';
+  homeBreak: string;
+  unitSystem: 'metric' | 'imperial';
+  updatedAt: number;
 }
 
 // ─── Forecast Types ────────────────────────────────────────────────────────────
