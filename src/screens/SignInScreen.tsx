@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Screen } from '@/types';
 import { useAuth } from '@/src/context/AuthContext';
+import { useToast } from '@/src/context/ToastContext';
 
 interface SignInScreenProps {
   onNavigate: (screen: Screen) => void;
@@ -8,6 +9,7 @@ interface SignInScreenProps {
 
 export const SignInScreen: React.FC<SignInScreenProps> = ({ onNavigate }) => {
   const { signIn, signInWithGoogle, authError } = useAuth();
+  const { addToast } = useToast();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -18,6 +20,8 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({ onNavigate }) => {
     setIsLoading(true);
     try {
       await signIn(email, password);
+      addToast('Successfully signed in', 'success');
+      onNavigate(Screen.HOME);
     } catch {
       // Error handled by context
     } finally {
@@ -29,6 +33,8 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({ onNavigate }) => {
     setIsLoading(true);
     try {
       await signInWithGoogle();
+      addToast('Successfully signed in with Google', 'success');
+      onNavigate(Screen.HOME);
     } catch {
       // Error handled by context
     } finally {

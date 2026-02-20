@@ -12,7 +12,7 @@ export const GuestBanner: React.FC<GuestBannerProps> = ({ onNavigate }) => {
   if (!isGuest) return null;
 
   return (
-    <div className="fixed bottom-16 left-0 right-0 z-20 max-w-md mx-auto">
+    <div className="fixed bottom-32 left-0 right-0 z-20 max-w-md mx-auto">
       <div className="flex items-center justify-between px-4 py-2.5 bg-cyan-500/95 backdrop-blur-sm">
         <div className="flex items-center gap-2">
           <span className="material-icons-round text-slate-900 text-base">wb_sunny</span>
