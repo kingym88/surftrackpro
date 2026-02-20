@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Screen } from '../types';
+import { Screen, SurfSpot } from '../types';
 import { GuestGate } from '@/src/components/GuestGate';
 import { useApp } from '@/src/context/AppContext';
 import { useAuth } from '@/src/context/AuthContext';
@@ -15,9 +15,10 @@ import type { GeminiInsight } from '@/types';
 
 interface HomeScreenProps {
   onNavigate: (screen: Screen) => void;
+  onSelectSpot?: (spot: SurfSpot) => void;
 }
 
-export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
+export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate, onSelectSpot }) => {
   const { homeSpotId, setHomeSpotId, forecasts, isLoadingForecast, forecastError, isGuest, tides, preferredWaveHeight, nearbySpotIds, sessions } = useApp();
   const { user } = useAuth();
 
@@ -37,7 +38,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
     if (homeSpotId && homeForecast && !isGuest && homeSpot) {
       setLoadingInsight(true);
       // Dummy break profile for now or extract from real spot
-      const breakProfile = homeSpot.breakProfile || {
+      const breakProfile = (homeSpot as any).breakProfile || {
         breakType: 'beach',
         facingDirection: 'W',
         optimalSwellDirection: 'W-NW',
@@ -74,7 +75,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
     return "Wind"; 
   };
 
-  const qualityScore = currentSnap ? computeSwellQuality(currentSnap, homeSpot?.breakProfile || {} as any) : null;
+  const qualityScore = currentSnap ? computeSwellQuality(currentSnap, (homeSpot as any)?.breakProfile || {} as any) : null;
 
   return (
     <div className="pb-24">
@@ -122,7 +123,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
           isLoadingForecast ? (
              <ForecastChartSkeleton />
           ) : (
-            <section onClick={() => onNavigate(Screen.SPOT_DETAIL)} className="cursor-pointer group space-y-2">
+            <section onClick={() => { if (homeSpot) onSelectSpot?.(homeSpot); }} className="cursor-pointer group space-y-2">
               {forecastError && (
                 <div className="bg-amber-900/40 rounded-lg p-2 text-amber-300 text-xs flex items-center gap-2">
                   <span className="material-icons-round text-sm">warning</span>
@@ -171,8 +172,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
         {homeSpotId && (
           <ForecastStrip
             forecasts={homeForecast ?? []}
-            onDayTap={(day) => onNavigate(Screen.SPOT_DETAIL)} 
+            onDaySelect={(day) => { if (homeSpot) onSelectSpot?.(homeSpot); }}
             isGuest={isGuest}
+            onNavigate={onNavigate}
           />
         )}
 
@@ -220,12 +222,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
             {nearbySpotIds.map(nid => {
               const ndata = portugalSpots.find(s => s.id === nid);
               const ncast = forecasts[nid]?.[0];
-              const nscore = ncast ? computeSwellQuality(ncast, ndata?.breakProfile || {} as any) : null;
+              const nscore = ncast ? computeSwellQuality(ncast, (ndata as any)?.breakProfile || {} as any) : null;
               
               if (!ndata) return null;
               
               return (
-                <div key={nid} onClick={() => onNavigate(Screen.SPOT_DETAIL)} className="bg-surface border border-border rounded-lg p-4 flex items-center justify-between cursor-pointer hover:bg-surface hover:brightness-110 transition-colors">
+                <div key={nid} onClick={() => { if (ndata) onSelectSpot?.(ndata as any); }} className="bg-surface border border-border rounded-lg p-4 flex items-center justify-between cursor-pointer hover:bg-surface hover:brightness-110 transition-colors">
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-12 rounded-lg overflow-hidden bg-primary/20 flex-shrink-0 flex items-center justify-center">
                       <span className="material-icons-round text-primary opacity-80">waves</span>

@@ -9,6 +9,8 @@ interface GuestGateProps {
   onNavigate: (screen: Screen) => void;
   /** If true, render a full-screen gate instead of an overlay */
   fullScreen?: boolean;
+  /** If true, show a simplified overlay for small elements */
+  clickOnly?: boolean;
 }
 
 export const GuestGate: React.FC<GuestGateProps> = ({
@@ -16,6 +18,7 @@ export const GuestGate: React.FC<GuestGateProps> = ({
   featureName,
   onNavigate,
   fullScreen = false,
+  clickOnly = false,
 }) => {
   const { isGuest } = useAuth();
 
@@ -60,16 +63,20 @@ export const GuestGate: React.FC<GuestGateProps> = ({
       </div>
 
       {/* Lock overlay */}
-      <div className="absolute inset-0 backdrop-blur-sm bg-background/60 rounded-xl z-10 flex flex-col items-center justify-center gap-3 p-4">
+      <div className="absolute inset-0 backdrop-blur-sm bg-background/60 rounded-xl z-10 flex flex-col items-center justify-center gap-3 p-4" onClick={() => onNavigate && onNavigate('SIGN_UP' as any)}>
         <span className="material-icons-round text-textMuted text-3xl">lock</span>
-        <p className="text-sm font-medium text-text text-center">{featureName}</p>
-        <button
-          id={`guest-gate-${featureName.replace(/\s+/g, '-').toLowerCase()}-btn`}
-          onClick={() => onNavigate(Screen.SIGN_UP)}
-          className="bg-cyan-500 hover:bg-cyan-400 active:scale-[0.98] text-slate-900 font-bold rounded-xl py-3 px-6 text-sm transition-all"
-        >
-          Sign Up Free
-        </button>
+        {!clickOnly && (
+          <>
+            <p className="text-sm font-medium text-text text-center">{featureName}</p>
+            <button
+              id={`guest-gate-${featureName.replace(/\s+/g, '-').toLowerCase()}-btn`}
+              onClick={() => onNavigate && onNavigate('SIGN_UP' as any)}
+              className="bg-cyan-500 hover:bg-cyan-400 active:scale-[0.98] text-slate-900 font-bold rounded-xl py-3 px-6 text-sm transition-all"
+            >
+              Sign Up Free
+            </button>
+          </>
+        )}
       </div>
     </div>
   );

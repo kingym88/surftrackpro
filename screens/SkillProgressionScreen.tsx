@@ -129,6 +129,12 @@ export const SkillProgressionScreen: React.FC<SkillProgressionScreenProps> = ({ 
             <div className="h-64 w-full" />
           </GuestGate>
         </div>
+      ) : sessions.length === 0 ? (
+        <div className="flex-1 flex flex-col items-center justify-center p-8 mt-24 text-center">
+          <span className="material-icons-round text-6xl text-primary/40 mb-4 animate-bounce">surfing</span>
+          <h2 className="text-xl font-bold mb-2 text-text">No Sessions Yet</h2>
+          <p className="text-textMuted text-sm mb-6 max-w-xs leading-relaxed">Log your first session to start tracking your skill progression and get AI coaching.</p>
+        </div>
       ) : (
         <main className="px-6 space-y-8 mt-6">
           {/* Timeframe Selector */}

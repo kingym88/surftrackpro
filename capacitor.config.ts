@@ -4,7 +4,7 @@ const config: CapacitorConfig = {
   appId: 'com.surftrackpro.app',
   appName: 'SurfTrack Pro',
   webDir: 'dist',
-  bundledWebRuntime: false,
+
   plugins: {
     SplashScreen: {
       launchShowDuration: 2000,

@@ -106,6 +106,7 @@ export const dummyTides: TidePoint[] = [
 
 // ─── Dummy Session (shown blurred to guests) ──────────────────────────────────
 export const dummySession: SessionLog = {
+  timestamp: Date.now(),
   id: 'dummy-session-1',
   spotName: 'Supertubos',
   spotId: 'supertubos',

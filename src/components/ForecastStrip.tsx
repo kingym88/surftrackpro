@@ -25,6 +25,7 @@ interface ForecastStripProps {
   onDaySelect?: (date: string) => void;
   /** Guest users see only today/tomorrow */
   isGuest?: boolean;
+  onNavigate?: (screen: Screen) => void;
 }
 
 function getLabelColour(label: SwellQualityScore['label']): string {
@@ -52,6 +53,7 @@ export const ForecastStrip: React.FC<ForecastStripProps> = ({
   forecasts,
   onDaySelect,
   isGuest = false,
+  onNavigate,
 }) => {
   if (!forecasts || forecasts.length === 0) {
     return (
@@ -97,7 +99,7 @@ export const ForecastStrip: React.FC<ForecastStripProps> = ({
 
           if (isLocked) {
             return (
-              <GuestGate key={day.date} featureName="Unlock full 7-day forecast" clickOnly>
+              <GuestGate key={day.date} featureName="Unlock full 7-day forecast" clickOnly onNavigate={onNavigate!}>
                 <div
                   className="snap-start flex-shrink-0 w-20 rounded-xl bg-surface/50 border border-border p-3 flex flex-col items-center gap-2 relative overflow-hidden cursor-pointer"
                 >

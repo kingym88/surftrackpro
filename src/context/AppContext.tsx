@@ -122,6 +122,7 @@ const initialState: AppState = {
 
 // ─── Context ──────────────────────────────────────────────────────────────────
 interface AppContextType extends AppState {
+  isGuest: boolean;
   dispatch: React.Dispatch<Action>;
   addSession: (session: SessionLog) => void;
   addBoard: (board: Board) => void;
@@ -263,6 +264,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, isGuest }) =
 
   const value: AppContextType = {
     ...state,
+    isGuest,
     dispatch,
     addSession,
     addBoard,

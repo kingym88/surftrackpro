@@ -109,7 +109,15 @@ export const SpotDetailScreen: React.FC<SpotDetailScreenProps> = ({ spot, onNavi
     }));
   }, [localForecasts]);
 
-  if (!spot) return null;
+  if (!spot) return (
+    <div className="flex-1 flex flex-col items-center justify-center p-8 h-screen bg-background">
+      <span className="material-icons-round text-6xl text-textMuted mb-4">location_off</span>
+      <h2 className="text-xl font-bold mb-2 text-text">No Spot Selected</h2>
+      <button onClick={onBack} className="mt-8 px-6 py-2 rounded-full border border-border text-text hover:bg-surface transition-colors">
+        Go Back
+      </button>
+    </div>
+  );
 
   const renderTabContent = () => {
     switch (activeTab) {

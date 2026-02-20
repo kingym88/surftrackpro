@@ -1,16 +1,15 @@
 # SURFTRACK PRO — QA AUDIT PROMPT
+
 ## Real-User Walkthrough, Dead-Link Detection & Data Validation Pass
 
 You are a senior QA engineer AND full-stack developer auditing the SurfTrack Pro app.
 Your job is to simulate a real human user walking through every screen and user flow, identify every broken link, dead-end, empty state, missing data, and navigation failure — then fix each one immediately before moving to the next.
 
-The repository is at: https://github.com/kingym88/surftrackpro
-
 ---
 
 ## CRITICAL: READ THESE FILES FIRST
 
-Before you begin the audit, read and fully understand these files:
+Before you begin the audit, read and fully understand these files, along with every other files in the repository:
 
 - `App.tsx` — understand the screen router, how `navigate(screen)` works, how `selectedSpot` and `selectedSession` are passed via parent state
 - `types.ts` — all interfaces and the Screen enum
@@ -218,11 +217,13 @@ Navigate to a spot from the HomeScreen nearby list or ForecastStrip.
 - [ ] FAB opens `LogSessionScreen`. The full 4-step form is shown (no GuestGate).
 
 **Step 1 — Spot Selection:**
+
 - [ ] Spot search is functional and returns results from `src/data/portugalSpots.ts`.
 - [ ] Selecting a spot auto-fills `waveHeight` and `wavePeriod` from `AppContext.forecasts[selectedSpotId]?.[0]`.
 - [ ] **FIX if:** Wave height and period fields are empty after spot selection.
 
 **Step 2 — Session Details:**
+
 - [ ] Date/time picker defaults to now and is interactive.
 - [ ] Duration slider moves between 30min and 4hr in 15-minute steps.
 - [ ] Star rating (1–5) is tappable. Tapping a star fills it and all stars before it.
@@ -231,11 +232,13 @@ Navigate to a spot from the HomeScreen nearby list or ForecastStrip.
 - [ ] **FIX if:** Dropdown is empty, shows only one hardcoded board, or crashes.
 
 **Step 3 — Performance Metrics:**
+
 - [ ] Wave count stepper (`+` / `-`) increments and decrements correctly. Cannot go below 0.
 - [ ] Top speed and longest ride inputs accept numbers only.
 - [ ] **FIX if:** Stepper goes negative or inputs accept non-numeric text.
 
 **Step 4 — Save:**
+
 - [ ] Tapping Save calls `addSession(uid, session)` in Firestore.
 - [ ] Also calls `AppContext.addSession(session)` so the new session is immediately visible in the app without a refresh.
 - [ ] A success toast appears: `"Session saved!"` — auto-dismisses after 2 seconds.

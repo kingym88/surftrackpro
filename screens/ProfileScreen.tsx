@@ -6,9 +6,10 @@ import { useTheme } from '@/src/context/ThemeContext';
 
 interface ProfileScreenProps {
   onNavigate: (screen: Screen) => void;
+  onSelectSession?: (session: any) => void;
 }
 
-export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate }) => {
+export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate, onSelectSession }) => {
   const { user, signOut } = useAuth();
   const { sessions, quiver, isGuest } = useApp();
   const { theme, toggleTheme } = useTheme();
@@ -43,6 +44,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate }) => {
     });
 
     const spotsVisited = Object.keys(spotCounts).length;
+    const wavesLogged = sessions.reduce((sum, s) => sum + (s.waveCount || 0), 0);
 
     // Board Usage breakdown
     const boardCounts = sessions.reduce((acc, s) => {
@@ -66,7 +68,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate }) => {
       .sort((a,b) => b.count - a.count)
       .slice(0, 3); // Top 3
 
-    return { totalSessions, lastSurfDays, topSpotName, topSpotCount, boardUsage, wavesLogged: '--', spotsVisited };
+    return { totalSessions, lastSurfDays, topSpotName, topSpotCount, boardUsage, wavesLogged, spotsVisited };
   }, [sessions, quiver, isGuest]);
 
 
@@ -227,6 +229,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate }) => {
                  <div 
                     key={session.id}
                     onClick={() => {
+                        if (onSelectSession) onSelectSession(session);
                         onNavigate(Screen.SESSION_DETAIL);
                     }} 
                     className="min-w-[280px] h-44 relative rounded-2xl overflow-hidden group cursor-pointer border border-border shadow-sm"

@@ -104,7 +104,14 @@ const AppInner: React.FC = () => {
         );
 
       case Screen.PROFILE:
-        return <ProfileScreen onNavigate={navigate} />;
+        return (
+          <ProfileScreen 
+            onNavigate={navigate} 
+            onSelectSession={(session) => {
+              setSelectedSession(session);
+            }}
+          />
+        );
 
       case Screen.SESSION_DETAIL:
         return (

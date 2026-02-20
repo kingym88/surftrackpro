@@ -27,6 +27,9 @@ export const LogSessionScreen: React.FC<LogSessionScreenProps> = ({ onBack, onCo
   // Auto-filled conditions state
   const [waveHeight, setWaveHeight] = useState('');
   const [wavePeriod, setWavePeriod] = useState('');
+  const [waveCount, setWaveCount] = useState(0);
+  const [topSpeed, setTopSpeed] = useState('');
+  const [longestRide, setLongestRide] = useState('');
 
   const selectedSpot = spots.find(s => s.id === selectedSpotId);
   const recentForecast = (selectedSpot && forecasts[selectedSpotId]) ? forecasts[selectedSpotId][0] : null;
@@ -49,6 +52,9 @@ export const LogSessionScreen: React.FC<LogSessionScreenProps> = ({ onBack, onCo
       date: new Date().toISOString(),
       timestamp: Date.now(),
       duration: durationHours * 60,
+      waveCount,
+      topSpeed: parseFloat(topSpeed) || 0,
+      longestRide: parseFloat(longestRide) || 0,
       boardId: selectedBoardId,
       rating,
       height: waveHeight || (recentForecast?.waveHeight.toString() || '0'),
@@ -98,9 +104,10 @@ export const LogSessionScreen: React.FC<LogSessionScreenProps> = ({ onBack, onCo
              <span className="material-icons-round text-text text-sm">arrow_back_ios_new</span>
            </button>
            <div className="flex gap-2">
-             <div className={`w-12 h-1.5 rounded-full transition-colors ${step >= 1 ? 'bg-primary' : 'bg-surface'}`}></div>
-             <div className={`w-12 h-1.5 rounded-full transition-colors ${step >= 2 ? 'bg-primary' : 'bg-surface'}`}></div>
-             <div className={`w-12 h-1.5 rounded-full transition-colors ${step >= 3 ? 'bg-primary' : 'bg-surface'}`}></div>
+             <div className={`w-10 h-1.5 rounded-full transition-colors ${step >= 1 ? 'bg-primary' : 'bg-surface'}`}></div>
+             <div className={`w-10 h-1.5 rounded-full transition-colors ${step >= 2 ? 'bg-primary' : 'bg-surface'}`}></div>
+             <div className={`w-10 h-1.5 rounded-full transition-colors ${step >= 3 ? 'bg-primary' : 'bg-surface'}`}></div>
+             <div className={`w-10 h-1.5 rounded-full transition-colors ${step >= 4 ? 'bg-primary' : 'bg-surface'}`}></div>
            </div>
            <button onClick={onBack} className="w-10 h-10 flex items-center justify-center text-textMuted hover:text-text transition-colors">
              <span className="material-icons-round text-xl">close</span>
@@ -222,8 +229,57 @@ export const LogSessionScreen: React.FC<LogSessionScreenProps> = ({ onBack, onCo
            </div>
          )}
 
-         {/* STEP 3: Notes */}
+         {/* STEP 3: Performance Metrics */}
          {step === 3 && (
+           <div className="animate-fadeIn">
+             <h1 className="text-3xl font-display font-bold tracking-tight text-text mb-8">Performance</h1>
+             
+             <section className="mb-8">
+               <h2 className="text-[10px] font-bold uppercase tracking-widest text-textMuted mb-2">Wave Count</h2>
+               <div className="flex items-center gap-4 bg-surface p-4 rounded-xl border border-border">
+                 <button 
+                   onClick={() => setWaveCount(Math.max(0, waveCount - 1))}
+                   className="w-12 h-12 flex items-center justify-center rounded-full bg-background border border-border hover:bg-border/50 transition-colors"
+                 >
+                   <span className="material-icons-round">remove</span>
+                 </button>
+                 <div className="flex-1 text-center text-3xl font-black text-text">{waveCount}</div>
+                 <button 
+                   onClick={() => setWaveCount(waveCount + 1)}
+                   className="w-12 h-12 flex items-center justify-center rounded-full bg-background border border-border hover:bg-border/50 transition-colors"
+                 >
+                   <span className="material-icons-round">add</span>
+                 </button>
+               </div>
+             </section>
+
+             <section className="grid grid-cols-2 gap-4 mb-4">
+               <div>
+                  <h2 className="text-[10px] font-bold uppercase tracking-widest text-textMuted mb-2">Top Speed (km/h)</h2>
+                  <input 
+                    type="number" 
+                    value={topSpeed}
+                    onChange={(e) => setTopSpeed(e.target.value)}
+                    placeholder="e.g. 25.4"
+                    className="w-full bg-surface text-text rounded-xl p-4 border border-border outline-none focus:border-primary"
+                  />
+               </div>
+               <div>
+                  <h2 className="text-[10px] font-bold uppercase tracking-widest text-textMuted mb-2">Longest Ride (m)</h2>
+                  <input 
+                    type="number" 
+                    value={longestRide}
+                    onChange={(e) => setLongestRide(e.target.value)}
+                    placeholder="e.g. 120"
+                    className="w-full bg-surface text-text rounded-xl p-4 border border-border outline-none focus:border-primary"
+                  />
+               </div>
+             </section>
+           </div>
+         )}
+
+         {/* STEP 4: Notes */}
+         {step === 4 && (
            <div className="animate-fadeIn">
              <h1 className="text-3xl font-display font-bold tracking-tight text-text mb-8">Almost done.</h1>
              
@@ -243,7 +299,7 @@ export const LogSessionScreen: React.FC<LogSessionScreenProps> = ({ onBack, onCo
          {/* Footer Action */}
          <div className="fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-background via-background/95 to-transparent z-40 backdrop-blur-sm">
            <div className="max-w-md mx-auto">
-             {step < 3 ? (
+             {step < 4 ? (
                <button 
                  disabled={(step === 1 && !selectedSpotId) || (step === 2 && !selectedBoardId)}
                  onClick={() => setStep(step + 1)} 
