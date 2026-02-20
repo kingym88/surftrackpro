@@ -8,11 +8,10 @@ import { GuestGate } from '@/src/components/GuestGate';
 import { addSession as addSessionFirestore } from '@/src/services/firestore';
 
 interface LogSessionScreenProps {
-  onBack: () => void;
-  onComplete: (session?: SessionLog) => void;
+  onNavigate: (screen: Screen, params?: any) => void;
 }
 
-export const LogSessionScreen: React.FC<LogSessionScreenProps> = ({ onBack, onComplete }) => {
+export const LogSessionScreen: React.FC<LogSessionScreenProps> = ({ onNavigate }) => {
   const { spots, quiver, addSession, forecasts, isGuest } = useApp();
   const { user } = useAuth();
   const { addToast } = useToast();
@@ -79,7 +78,7 @@ export const LogSessionScreen: React.FC<LogSessionScreenProps> = ({ onBack, onCo
     
     addSession(newSession);
     addToast('Session logged successfully!', 'success');
-    onComplete(newSession);
+    onNavigate(Screen.SESSION_DETAIL, { session: newSession });
   };
 
   if (isGuest) {
@@ -88,7 +87,7 @@ export const LogSessionScreen: React.FC<LogSessionScreenProps> = ({ onBack, onCo
         <GuestGate featureName="Log your surf sessions">
           <div className="h-64 w-full" />
         </GuestGate>
-        <button onClick={onBack} className="mt-8 px-6 py-2 rounded-full border border-border text-textMuted hover:text-text transition-colors">
+        <button onClick={() => onNavigate(Screen.HOME)} className="mt-8 px-6 py-2 rounded-full border border-border text-textMuted hover:text-text transition-colors">
           Back
         </button>
       </div>
@@ -100,7 +99,7 @@ export const LogSessionScreen: React.FC<LogSessionScreenProps> = ({ onBack, onCo
        <main className="max-w-md mx-auto px-6 pb-24 pt-12">
          {/* Navigation & Progress */}
          <header className="flex items-center justify-between mb-8">
-           <button onClick={() => step > 1 ? setStep(step - 1) : onBack()} className="w-10 h-10 rounded-full bg-surface border border-border flex items-center justify-center hover:bg-surface/80 transition-colors">
+           <button onClick={() => step > 1 ? setStep(step - 1) : onNavigate(Screen.HOME)} className="w-10 h-10 rounded-full bg-surface border border-border flex items-center justify-center hover:bg-surface/80 transition-colors">
              <span className="material-icons-round text-text text-sm">arrow_back_ios_new</span>
            </button>
            <div className="flex gap-2">
@@ -109,7 +108,7 @@ export const LogSessionScreen: React.FC<LogSessionScreenProps> = ({ onBack, onCo
              <div className={`w-10 h-1.5 rounded-full transition-colors ${step >= 3 ? 'bg-primary' : 'bg-surface'}`}></div>
              <div className={`w-10 h-1.5 rounded-full transition-colors ${step >= 4 ? 'bg-primary' : 'bg-surface'}`}></div>
            </div>
-           <button onClick={onBack} className="w-10 h-10 flex items-center justify-center text-textMuted hover:text-text transition-colors">
+           <button onClick={() => onNavigate(Screen.HOME)} className="w-10 h-10 flex items-center justify-center text-textMuted hover:text-text transition-colors">
              <span className="material-icons-round text-xl">close</span>
            </button>
          </header>

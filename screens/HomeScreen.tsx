@@ -14,11 +14,10 @@ import { getGeminiInsight } from '@/src/services/geminiInsight';
 import type { GeminiInsight } from '@/types';
 
 interface HomeScreenProps {
-  onNavigate: (screen: Screen) => void;
-  onSelectSpot?: (spot: SurfSpot) => void;
+  onNavigate: (screen: Screen, params?: any) => void;
 }
 
-export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate, onSelectSpot }) => {
+export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
   const { homeSpotId, setHomeSpotId, forecasts, isLoadingForecast, forecastError, isGuest, tides, preferredWaveHeight, nearbySpotIds, sessions } = useApp();
   const { user } = useAuth();
 
@@ -37,14 +36,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate, onSelectSpot
   useEffect(() => {
     if (homeSpotId && homeForecast && !isGuest && homeSpot) {
       setLoadingInsight(true);
-      // Dummy break profile for now or extract from real spot
-      const breakProfile = (homeSpot as any).breakProfile || {
-        breakType: 'beach',
-        facingDirection: 'W',
-        optimalSwellDirection: 'W-NW',
-        optimalTidePhase: 'mid',
-        optimalWindDirection: 'E-NE',
-      };
+      const breakProfile = homeSpot.breakProfile;
 
       getGeminiInsight(homeForecast, breakProfile, sessions, preferredWaveHeight || { min: 0.5, max: 3.0 })
         .then(setInsight)
@@ -123,7 +115,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate, onSelectSpot
           isLoadingForecast ? (
              <ForecastChartSkeleton />
           ) : (
-            <section onClick={() => { if (homeSpot) onSelectSpot?.(homeSpot); }} className="cursor-pointer group space-y-2">
+            <section onClick={() => { if (homeSpot) onNavigate(Screen.SPOT_DETAIL, { spot: homeSpot }); }} className="cursor-pointer group space-y-2">
               {forecastError && (
                 <div className="bg-amber-900/40 rounded-lg p-2 text-amber-300 text-xs flex items-center gap-2">
                   <span className="material-icons-round text-sm">warning</span>
@@ -172,7 +164,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate, onSelectSpot
         {homeSpotId && (
           <ForecastStrip
             forecasts={homeForecast ?? []}
-            onDaySelect={(day) => { if (homeSpot) onSelectSpot?.(homeSpot); }}
+            onDaySelect={(day) => { if (homeSpot) onNavigate(Screen.SPOT_DETAIL, { spot: homeSpot }); }}
             isGuest={isGuest}
             onNavigate={onNavigate}
           />
@@ -227,7 +219,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate, onSelectSpot
               if (!ndata) return null;
               
               return (
-                <div key={nid} onClick={() => { if (ndata) onSelectSpot?.(ndata as any); }} className="bg-surface border border-border rounded-lg p-4 flex items-center justify-between cursor-pointer hover:bg-surface hover:brightness-110 transition-colors">
+                <div key={nid} onClick={() => { if (ndata) onNavigate(Screen.SPOT_DETAIL, { spot: ndata }); }} className="bg-surface border border-border rounded-lg p-4 flex items-center justify-between cursor-pointer hover:bg-surface hover:brightness-110 transition-colors">
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-12 rounded-lg overflow-hidden bg-primary/20 flex-shrink-0 flex items-center justify-center">
                       <span className="material-icons-round text-primary opacity-80">waves</span>

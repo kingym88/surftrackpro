@@ -115,9 +115,9 @@ const initialState: AppState = {
   geminiInsights: {},
   isLoadingForecast: false,
   forecastError: null,
-  homeSpotId: null,
+  homeSpotId: 'carcavelos',
   preferredWaveHeight: null,
-  nearbySpotIds: [],
+  nearbySpotIds: getNearestSpots(portugalSpots, 'carcavelos', 5).map(s => s.id),
 };
 
 // ─── Context ──────────────────────────────────────────────────────────────────
@@ -178,9 +178,27 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, isGuest }) =
         // Let's rely on state.homeSpotId + state.nearbySpotIds for which spots to fetch
         // (This effect triggers when isGuest changes, we will handle fetching in a separate effect below depending on spots)
       }
+      
+      // Restore homeSpotId preference
+      const homeKey = isGuest ? 'guest_homeSpotId' : 'user_homeSpotId';
+      const { value: homeId } = await Preferences.get({ key: homeKey });
+      if (homeId) {
+        dispatch({ type: 'SET_HOME_SPOT_ID', payload: homeId });
+      }
     }
     initApp();
   }, [isGuest]);
+
+  // Handle saving homeSpotId preference
+  useEffect(() => {
+    async function saveHomeSpot() {
+      if (state.homeSpotId) {
+        const homeKey = isGuest ? 'guest_homeSpotId' : 'user_homeSpotId';
+        await Preferences.set({ key: homeKey, value: state.homeSpotId });
+      }
+    }
+    saveHomeSpot();
+  }, [state.homeSpotId, isGuest]);
 
   // Fetch forecast for homeSpotId and nearbySpotIds when they change, for logged in users
   useEffect(() => {

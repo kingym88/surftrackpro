@@ -7,11 +7,10 @@ import { SpotCardSkeleton } from '@/src/components/Skeletons';
 import { ErrorBoundary } from '@/src/components/ErrorBoundary';
 
 interface SpotListScreenProps {
-  onNavigate: (screen: Screen) => void;
-  onSelectSpot: (spot: SurfSpot) => void;
+  onNavigate: (screen: Screen, params?: any) => void;
 }
 
-export const SpotListScreen: React.FC<SpotListScreenProps> = ({ onNavigate, onSelectSpot }) => {
+export const SpotListScreen: React.FC<SpotListScreenProps> = ({ onNavigate }) => {
   const { spots, qualityScores, homeSpotId } = useApp();
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -85,7 +84,7 @@ export const SpotListScreen: React.FC<SpotListScreenProps> = ({ onNavigate, onSe
              return (
               <div 
                 key={spot.id}
-                onClick={() => onSelectSpot(spot)} 
+                onClick={() => onNavigate(Screen.SPOT_DETAIL, { spot })} 
                 className="group bg-surface border border-border hover:border-primary/40 rounded-2xl p-4 cursor-pointer transition-all shadow-sm hover:shadow-md"
               >
                 <div className="flex gap-4">

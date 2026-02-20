@@ -47,7 +47,11 @@ const AppInner: React.FC = () => {
   const [selectedSpot, setSelectedSpot] = useState<SurfSpot | null>(null);
   const [selectedSession, setSelectedSession] = useState<SessionLog | null>(null);
 
-  const navigate = useCallback((screen: Screen) => setCurrentScreen(screen), []);
+  const navigate = useCallback((screen: Screen, params?: any) => {
+    if (params?.spot) setSelectedSpot(params.spot);
+    if (params?.session) setSelectedSession(params.session);
+    setCurrentScreen(screen);
+  }, []);
 
   if (isLoadingAuth) {
     return <AuthLoadingSplash />;
@@ -69,13 +73,7 @@ const AppInner: React.FC = () => {
 
       case Screen.LOG_SESSION:
         return (
-          <LogSessionScreen
-            onBack={() => navigate(Screen.HOME)}
-            onComplete={(session?: SessionLog) => {
-              if (session) setSelectedSession(session);
-              navigate(Screen.SESSION_DETAIL);
-            }}
-          />
+          <LogSessionScreen onNavigate={navigate} />
         );
 
       case Screen.SURF_MATCH:
@@ -94,23 +92,12 @@ const AppInner: React.FC = () => {
 
       case Screen.SPOT_LIST:
         return (
-          <SpotListScreen
-            onNavigate={navigate}
-            onSelectSpot={(spot: SurfSpot) => {
-              setSelectedSpot(spot);
-              navigate(Screen.SPOT_DETAIL);
-            }}
-          />
+          <SpotListScreen onNavigate={navigate} />
         );
 
       case Screen.PROFILE:
         return (
-          <ProfileScreen 
-            onNavigate={navigate} 
-            onSelectSession={(session) => {
-              setSelectedSession(session);
-            }}
-          />
+          <ProfileScreen onNavigate={navigate} />
         );
 
       case Screen.SESSION_DETAIL:

@@ -136,4 +136,5 @@ export interface PortugalSpotSeed {
   country: 'PT';
   latitude: number;
   longitude: number;
+  breakProfile: SpotBreakProfile; // Now required for all seeds
 }

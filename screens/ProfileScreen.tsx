@@ -5,11 +5,10 @@ import { useApp } from '@/src/context/AppContext';
 import { useTheme } from '@/src/context/ThemeContext';
 
 interface ProfileScreenProps {
-  onNavigate: (screen: Screen) => void;
-  onSelectSession?: (session: any) => void;
+  onNavigate: (screen: Screen, params?: any) => void;
 }
 
-export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate, onSelectSession }) => {
+export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate }) => {
   const { user, signOut } = useAuth();
   const { sessions, quiver, isGuest } = useApp();
   const { theme, toggleTheme } = useTheme();
@@ -242,8 +241,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate, onSele
                  <div 
                     key={session.id}
                     onClick={() => {
-                        if (onSelectSession) onSelectSession(session);
-                        onNavigate(Screen.SESSION_DETAIL);
+                        onNavigate(Screen.SESSION_DETAIL, { session });
                     }} 
                     className="min-w-[280px] h-44 relative rounded-2xl overflow-hidden group cursor-pointer border border-border shadow-sm"
                   >
