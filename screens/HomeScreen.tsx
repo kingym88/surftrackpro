@@ -3,7 +3,7 @@ import { Screen, SurfSpot } from '../types';
 import { GuestGate } from '@/src/components/GuestGate';
 import { useApp } from '@/src/context/AppContext';
 import { useAuth } from '@/src/context/AuthContext';
-import { portugalSpots } from '@/src/data/portugalSpots';
+import { PORTUGAL_SPOTS } from '@/src/data/portugalSpots';
 import { Preferences } from '@capacitor/preferences';
 import { updateUserProfile } from '@/src/services/firestore';
 import { ForecastChartSkeleton } from '@/src/components/Skeletons';
@@ -11,6 +11,7 @@ import { computeSwellQuality } from '@/src/services/swellQuality';
 import { ForecastStrip } from '@/src/components/ForecastStrip';
 import { TideMiniChart } from '@/src/components/TideMiniChart';
 import { getGeminiInsight } from '@/src/services/geminiInsight';
+import * as SunCalc from 'suncalc';
 import type { GeminiInsight } from '@/types';
 
 interface HomeScreenProps {
@@ -31,7 +32,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
     setShowSpotPicker(!homeSpotId);
   }, [homeSpotId]);
 
-  const homeSpot = portugalSpots.find(s => s.id === homeSpotId);
+  const homeSpot = PORTUGAL_SPOTS.find(s => s.id === homeSpotId);
   const homeForecast = homeSpotId ? forecasts[homeSpotId] : undefined;
   const currentSnap = homeForecast?.[0];
 
@@ -59,7 +60,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
     setTimeout(() => setShowSuggestions(false), 200); // small delay to allow click
   };
 
-  const toSurfSpot = (seed: typeof portugalSpots[0]): SurfSpot => ({
+  const toSurfSpot = (seed: typeof PORTUGAL_SPOTS[0]): SurfSpot => ({
     id: seed.id,
     name: seed.name,
     distance: '— km',
@@ -74,7 +75,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
   });
 
   const filteredSuggestions = searchQuery.length >= 1 
-    ? portugalSpots.filter(s => s.name.toLowerCase().includes(searchQuery.toLowerCase())).slice(0, 5)
+    ? PORTUGAL_SPOTS.filter(s => s.name.toLowerCase().includes(searchQuery.toLowerCase())).slice(0, 5)
     : [];
 
   const getWindIcon = (dir: number) => {
@@ -261,30 +262,53 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
         {/* Weather/Tide Quick Glance */}
         {homeSpotId && (() => {
            const tidesArray = tides[homeSpotId] ?? [];
-           // Find the first high tide strictly in the future.
-           // We'll also just assume sunrise/sunset is generic or "--" since it's not in the forecast snapshot
+           const spotDetail = PORTUGAL_SPOTS.find(s => s.id === homeSpotId);
            const now = new Date();
-           const upcomingHigh = tidesArray.find(t => new Date(t.time) > now && t.type === 'HIGH');
-           const nextHighTideTime = upcomingHigh ? new Date(upcomingHigh.time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--';
-           const nextHighTideHeight = upcomingHigh ? upcomingHigh.height.toFixed(1) : '--';
+           
+           // Upcoming Tide Info
+           const upcomingTide = tidesArray.find(t => new Date(t.time) > now && (t.type === 'HIGH' || t.type === 'LOW'));
+           
+           const tideTimeText = upcomingTide 
+             ? new Date(upcomingTide.time).toLocaleTimeString([], { timeZone: 'Europe/Lisbon', hour: '2-digit', minute:'2-digit'}) 
+             : '--';
+           
+           const tideHeightText = upcomingTide 
+             ? upcomingTide.height.toFixed(1) 
+             : '--';
+           
+           const tideLabel = upcomingTide?.type === 'HIGH' ? 'High' : 'Low';
+           const tideTrendLabel = upcomingTide?.type === 'HIGH' ? 'rising' : 'falling';
+           const tideIcon = upcomingTide?.type === 'HIGH' ? 'trending_up' : 'trending_down';
+
+           // Sunset Info
+           let sunsetTimeText = '--';
+           let sunlightHours = 0;
+           if (spotDetail) {
+             const sunTimes = SunCalc.getTimes(now, spotDetail.latitude, spotDetail.longitude);
+             sunsetTimeText = sunTimes.sunset.toLocaleTimeString([], { timeZone: 'Europe/Lisbon', hour: '2-digit', minute: '2-digit' });
+             
+             // Calculate daylight hours
+             const msDiff = sunTimes.sunset.getTime() - sunTimes.sunrise.getTime();
+             sunlightHours = Math.round(msDiff / 3600000);
+           }
 
            return (
             <section className="grid grid-cols-2 gap-4">
               <div className="bg-white/5 rounded-xl p-4 border border-white/5">
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-[10px] font-bold text-primary uppercase">Tide</p>
-                  <span className="material-icons-round text-sm text-slate-500">trending_up</span>
+                  <span className="material-icons-round text-sm text-slate-500">{tideIcon}</span>
                 </div>
-                <h5 className="text-lg font-bold">High <span className="text-xs font-normal text-slate-500">at {nextHighTideTime}</span></h5>
-                <p className="text-xs text-slate-400 mt-1">{nextHighTideHeight}m rising</p>
+                <h5 className="text-lg font-bold">{tideLabel} <span className="text-xs font-normal text-slate-500">at {tideTimeText}</span></h5>
+                <p className="text-xs text-slate-400 mt-1">{tideHeightText}m {tideTrendLabel}</p>
               </div>
               <div className="bg-white/5 rounded-xl p-4 border border-white/5">
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-[10px] font-bold text-primary uppercase">Sun</p>
                   <span className="material-icons-round text-sm text-slate-500">wb_sunny</span>
                 </div>
-                <h5 className="text-lg font-bold">Sunset <span className="text-xs font-normal text-slate-500">at 7:45 PM</span></h5>
-                <p className="text-xs text-slate-400 mt-1">11h of daylight</p>
+                <h5 className="text-lg font-bold">Sunset <span className="text-xs font-normal text-slate-500">at {sunsetTimeText}</span></h5>
+                <p className="text-xs text-slate-400 mt-1">{sunlightHours}h of daylight</p>
               </div>
             </section>
            );
@@ -299,7 +323,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
           <div className="space-y-3">
             {nearbySpotIds.length === 0 && <p className="text-sm text-slate-500">No spots nearby or loading...</p>}
             {nearbySpotIds.map(nid => {
-              const ndata = portugalSpots.find(s => s.id === nid);
+              const ndata = PORTUGAL_SPOTS.find(s => s.id === nid);
               const ncast = forecasts[nid]?.[0];
               const nscore = ncast ? computeSwellQuality(ncast, (ndata as any)?.breakProfile || {} as any) : null;
               

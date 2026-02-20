@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '@/src/context/AppContext';
 import { getGeminiInsight } from '@/src/services/geminiInsight';
 import { GuestGate } from '@/src/components/GuestGate';
-import { portugalSpots } from '@/src/data/portugalSpots';
+import { PORTUGAL_SPOTS } from '@/src/data/portugalSpots';
 import {
   LineChart,
   Line,
@@ -23,7 +23,7 @@ export const SkillProgressionScreen: React.FC<SkillProgressionScreenProps> = ({ 
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
   const [isLoadingAnalysis, setIsLoadingAnalysis] = useState(false);
 
-  const homeSpot = useMemo(() => portugalSpots.find(s => s.id === homeSpotId), [homeSpotId]);
+  const homeSpot = useMemo(() => PORTUGAL_SPOTS.find(s => s.id === homeSpotId), [homeSpotId]);
 
   // Filter sessions
   const filteredSessions = useMemo(() => {

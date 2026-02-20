@@ -13,7 +13,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import type { SurfSpot, SessionLog, Board, ForecastSnapshot, TidePoint } from '@/types';
-import { portugalSpots } from '@/src/data/portugalSpots';
+import { PORTUGAL_SPOTS } from '@/src/data/portugalSpots';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface UserProfile {
@@ -164,10 +164,10 @@ export async function getNearestSpots(
   baseSpotId: string,
   limit: number = 5,
 ): Promise<SurfSpot[]> {
-  const baseSpot = portugalSpots.find(s => s.id === baseSpotId);
+  const baseSpot = PORTUGAL_SPOTS.find(s => s.id === baseSpotId);
   if (!baseSpot) return [];
 
-  const others = portugalSpots.filter(s => s.id !== baseSpotId);
+  const others = PORTUGAL_SPOTS.filter(s => s.id !== baseSpotId);
 
   const withDistance = others.map(s => ({
     spot: s,

@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useReducer, useCallback, useEffect } from 'react';
 import type { SurfSpot, SessionLog, Board, ForecastSnapshot, TidePoint, SwellQualityScore, GeminiInsight } from '@/types';
 import { dummySpots, dummyForecast, dummyTides } from '@/src/data/guestDummyData';
-import { getNearestSpots, portugalSpots } from '@/src/data/portugalSpots';
+import { getNearestSpots, PORTUGAL_SPOTS } from '@/src/data/portugalSpots';
 import { Geolocation } from '@capacitor/geolocation';
 import { Capacitor } from '@capacitor/core';
 import { Preferences } from '@capacitor/preferences';
@@ -80,7 +80,7 @@ function reducer(state: AppState, action: Action): AppState {
     case 'SET_FORECAST_ERROR':
       return { ...state, forecastError: action.payload };
     case 'SET_HOME_SPOT_ID': {
-      const nearest = getNearestSpots(portugalSpots, action.payload, 5).map(s => s.id);
+      const nearest = getNearestSpots(PORTUGAL_SPOTS, action.payload, 5).map(s => s.id);
       return { ...state, homeSpotId: action.payload, nearbySpotIds: nearest };
     }
     case 'SET_PREFERRED_WAVE_HEIGHT':
@@ -119,7 +119,7 @@ const initialState: AppState = {
   forecastError: null,
   homeSpotId: 'carcavelos',
   preferredWaveHeight: null,
-  nearbySpotIds: getNearestSpots(portugalSpots, 'carcavelos', 5).map(s => s.id),
+  nearbySpotIds: getNearestSpots(PORTUGAL_SPOTS, 'carcavelos', 5).map(s => s.id),
 };
 
 // ─── Context ──────────────────────────────────────────────────────────────────
@@ -161,7 +161,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, isGuest, uid
         const { value: quiv } = await Preferences.get({ key: 'guest_temp_boards' });
         if (quiv) dispatch({ type: 'SET_QUIVER', payload: JSON.parse(quiv) });
       } else {
-        const normalizedSpots: SurfSpot[] = portugalSpots.map(s => ({
+        const normalizedSpots: SurfSpot[] = PORTUGAL_SPOTS.map(s => ({
           id: s.id,
           name: s.name,
           distance: '— km',
@@ -247,7 +247,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, isGuest, uid
       try {
         await Promise.all(
           spotsToFetch.map(async (spotId) => {
-            const spotData = portugalSpots.find(s => s.id === spotId);
+            const spotData = PORTUGAL_SPOTS.find(s => s.id === spotId);
             if (!spotData) return;
             // Fetch live OpenMeteo forecast and tides concurrently
             const todayStr = new Date().toISOString().split('T')[0];

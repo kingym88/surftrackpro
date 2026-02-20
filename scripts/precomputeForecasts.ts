@@ -10,7 +10,7 @@
  */
 
 import admin from 'firebase-admin';
-import { portugalSpots } from '../src/data/portugalSpots.js';
+import { PORTUGAL_SPOTS } from '../src/data/portugalSpots.js';
 
 const PROJECT_ID    = process.env.FIREBASE_PROJECT_ID;
 const CLIENT_EMAIL  = process.env.FIREBASE_CLIENT_EMAIL;
@@ -170,8 +170,8 @@ async function run() {
   const BATCH_SIZE = 3; // Reduced from 5
   const DELAY_MS = 1500; // Increased from 1100
 
-  for (let i = 0; i < portugalSpots.length; i += BATCH_SIZE) {
-    const batch = portugalSpots.slice(i, i + BATCH_SIZE);
+  for (let i = 0; i < PORTUGAL_SPOTS.length; i += BATCH_SIZE) {
+    const batch = PORTUGAL_SPOTS.slice(i, i + BATCH_SIZE);
     
     await Promise.all(batch.map(async (spot) => {
       try {
@@ -182,7 +182,7 @@ async function run() {
       }
     }));
 
-    if (i + BATCH_SIZE < portugalSpots.length) {
+    if (i + BATCH_SIZE < PORTUGAL_SPOTS.length) {
       await new Promise(r => setTimeout(r, DELAY_MS));
     }
   }

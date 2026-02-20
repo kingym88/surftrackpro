@@ -48,21 +48,53 @@ export async function fetchTidePredictions(
   return generateSyntheticTides(date);
 }
 
-export function generateSyntheticTides(date: string, offset = 0): TidePoint[] {
-  const base = new Date(`${date}T00:00:00Z`);
+export function generateSyntheticTides(date: string): TidePoint[] {
+  // Reference High Tide: Feb 21, 2026 at 04:41 WET (UTC+0)
+  const refTime = Date.UTC(2026, 1, 21, 4, 41, 0); 
+  const per = 12.4206012 * 3600000; // 12h 25m 14s total cycle
+  const halfPer = per / 2; // ~6h 12m between High and Low
   const amp  = 1.5;
-  const per  = 12.42;
   const pts: TidePoint[] = [];
-  for (let h = 0; h < 48; h++) {
-    const t = new Date(base.getTime() + h * 3600000);
-    const hours = h + offset;
-    const height = amp * Math.cos((2 * Math.PI * hours) / per);
-    const prev = amp * Math.cos((2 * Math.PI * (hours - 0.5)) / per);
-    const next = amp * Math.cos((2 * Math.PI * (hours + 0.5)) / per);
-    let type: any = null;
-    if (height > prev && height > next && height > amp * 0.85) type = 'HIGH';
-    else if (height < prev && height < next && height < -amp * 0.85) type = 'LOW';
-    pts.push({ time: t.toISOString(), height: parseFloat((height + amp).toFixed(2)), type });
+
+  // Window starts at beginning of 'date' (UTC boundaries)
+  const startOfDay = new Date(`${date}T00:00:00Z`).getTime();
+  const endOfWindow = startOfDay + 48 * 3600000; // Request covers 48 hours for chart completeness
+
+  // Align cycle backward/forward from reference
+  const diff = startOfDay - refTime;
+  const periods = Math.floor(diff / per);
+  let currentHigh = refTime + periods * per;
+
+  // We should walk backwards slightly more just in case a Low comes before the First High
+  let t = currentHigh - per;
+  while (t <= endOfWindow) {
+    if (t >= startOfDay) {
+      pts.push({ 
+        time: new Date(t).toISOString(), 
+        height: parseFloat((amp * 2).toFixed(2)), 
+        type: 'HIGH' 
+      });
+    }
+    const nextLow = t + halfPer;
+    if (nextLow >= startOfDay && nextLow <= endOfWindow) {
+      pts.push({ 
+        time: new Date(nextLow).toISOString(), 
+        height: 0.1, 
+        type: 'LOW' 
+      });
+    }
+    t += per;
   }
-  return pts;
+
+  // Also pre-fill hourly points so Recharts `TideMiniChart` renders a curve smoothly!
+  for (let h = 0; h < 48; h++) {
+    const ht = startOfDay + h * 3600000;
+    const diffHours = (ht - refTime) / 3600000;
+    const height = amp * Math.cos((2 * Math.PI * diffHours) / 12.4206012);
+    // Add continuous hourly dots. To avoid duplicates with exact points, mark type null.
+    pts.push({ time: new Date(ht).toISOString(), height: parseFloat((height + amp).toFixed(2)), type: null });
+  }
+
+  // Sort them sequentially so the chart reads time correctly 
+  return pts.sort((a,b) => new Date(a.time).getTime() - new Date(b.time).getTime());
 }

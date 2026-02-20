@@ -3,7 +3,7 @@ import { Screen } from '@/types';
 import { useAuth } from '@/src/context/AuthContext';
 import { useToast } from '@/src/context/ToastContext';
 import { useApp } from '@/src/context/AppContext';
-import { portugalSpots } from '@/src/data/portugalSpots';
+import { PORTUGAL_SPOTS } from '@/src/data/portugalSpots';
 
 interface SignUpScreenProps {
   onNavigate: (screen: Screen) => void;
@@ -26,11 +26,11 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({ onNavigate }) => {
   const [localError, setLocalError] = useState<string | null>(null);
 
   const filteredSpots = spotSearch.length > 0
-    ? portugalSpots.filter(s =>
+    ? PORTUGAL_SPOTS.filter(s =>
         s.name.toLowerCase().includes(spotSearch.toLowerCase()) ||
         s.region.toLowerCase().includes(spotSearch.toLowerCase())
       )
-    : portugalSpots;
+    : PORTUGAL_SPOTS;
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
