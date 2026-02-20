@@ -13,7 +13,7 @@ export async function fetchOpenMeteoForecast(
     latitude: lat.toString(),
     longitude: lon.toString(),
     hourly: '',
-    timezone: 'UTC',
+    timezone: 'Europe/Lisbon',
     forecast_days: '7',
   };
 

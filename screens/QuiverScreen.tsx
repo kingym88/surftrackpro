@@ -1,11 +1,16 @@
 import React from 'react';
 import { Screen } from '../types';
+import { useAuth } from '@/src/context/AuthContext';
+import { useApp } from '@/src/context/AppContext';
 
 interface QuiverScreenProps {
   onNavigate: (screen: Screen) => void;
 }
 
 export const QuiverScreen: React.FC<QuiverScreenProps> = ({ onNavigate }) => {
+  const { isGuest } = useAuth();
+  const { quiver } = useApp();
+
   return (
     <div className="pb-24">
         {/* Header */}
@@ -16,10 +21,64 @@ export const QuiverScreen: React.FC<QuiverScreenProps> = ({ onNavigate }) => {
                     <span className="material-icons-round">search</span>
                 </button>
             </div>
-            <p className="text-textMuted text-sm">Managing 4 boards in your collection</p>
+            <p className="text-textMuted text-sm">Managing {quiver.length > 0 || isGuest ? quiver.length || 2 : 0} boards in your collection</p>
         </header>
 
         <main className="px-5 py-6 space-y-6">
+            {!isGuest && quiver.length === 0 && (
+              <div className="text-center py-12 mt-4 text-textMuted border-2 border-dashed border-slate-700/50 rounded-xl">
+                <span className="material-icons-round text-5xl mb-3 text-slate-600">surfing</span>
+                <p>You have no boards yet.</p>
+                <p className="text-sm">Tap the + icon to add your first board.</p>
+              </div>
+            )}
+
+            {quiver.map((board) => (
+              <div key={board.id} className="bg-background rounded-xl overflow-hidden shadow-sm border border-primary/10 group cursor-pointer hover:border-primary/30 transition-all">
+                  <div className="relative h-48 overflow-hidden bg-surface flex items-center justify-center">
+                      {board.photo ? (
+                        <img src={board.photo} alt="Surfboard" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                      ) : (
+                        <span className="material-icons-round text-6xl text-slate-600">surfing</span>
+                      )}
+                      <div className="absolute top-3 right-3">
+                          <span className="bg-primary text-text text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full shadow-lg">
+                            {board.boardType}
+                          </span>
+                      </div>
+                  </div>
+                  <div className="p-5">
+                      <div className="flex justify-between items-start mb-4">
+                          <div>
+                              <h3 className="text-xl font-bold text-text">{board.model}</h3>
+                              <p className="text-slate-500 text-sm">{board.brand}</p>
+                          </div>
+                          <div className="text-right">
+                              <span className="text-2xl font-bold text-primary">{board.volume.toFixed(1)}<span className="text-sm ml-0.5">L</span></span>
+                          </div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 py-3 border-t border-border">
+                          <div className="flex flex-col">
+                              <span className="text-[10px] uppercase text-slate-500 font-semibold">Length</span>
+                              <span className="font-medium text-textMuted">
+                                {Math.floor(board.length)}'{Math.round((board.length % 1) * 12)}"
+                              </span>
+                          </div>
+                          <div className="flex flex-col">
+                              <span className="text-[10px] uppercase text-slate-500 font-semibold">Width</span>
+                              <span className="font-medium text-textMuted">{board.width}"</span>
+                          </div>
+                          <div className="flex flex-col">
+                              <span className="text-[10px] uppercase text-slate-500 font-semibold">Thick</span>
+                              <span className="font-medium text-textMuted">{board.thickness}"</span>
+                          </div>
+                      </div>
+                  </div>
+              </div>
+            ))}
+
+            {isGuest && quiver.length === 0 && (
+              <>
             {/* Board 1 */}
             <div className="bg-background rounded-xl overflow-hidden shadow-sm border border-primary/10 group cursor-pointer hover:border-primary/30 transition-all">
                 <div className="relative h-48 overflow-hidden bg-surface">
@@ -89,6 +148,8 @@ export const QuiverScreen: React.FC<QuiverScreenProps> = ({ onNavigate }) => {
                     </div>
                 </div>
             </div>
+             </>
+            )}
         </main>
 
         <button 

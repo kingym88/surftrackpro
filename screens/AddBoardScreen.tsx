@@ -1,4 +1,8 @@
 import React, { useState } from 'react';
+import { useAuth } from '@/src/context/AuthContext';
+import { useApp } from '@/src/context/AppContext';
+import { addBoard as addBoardFirestore } from '@/src/services/firestore';
+import type { Board } from '@/types';
 
 interface AddBoardScreenProps {
   onBack: () => void;
@@ -6,14 +10,58 @@ interface AddBoardScreenProps {
 }
 
 export const AddBoardScreen: React.FC<AddBoardScreenProps> = ({ onBack, onSave }) => {
+  const { user } = useAuth();
+  const { addBoard } = useApp();
+
+  const [brand, setBrand] = useState('');
+  const [model, setModel] = useState('');
+  const [lengthFt, setLengthFt] = useState('');
+  const [lengthIn, setLengthIn] = useState('');
   const [volume, setVolume] = useState(28);
+  const [boardType, setBoardType] = useState<Board['boardType']>('shortboard');
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSave = async () => {
+    if (!brand || !model || !lengthFt) return;
+    setIsSaving(true);
+    
+    // total length conceptually (or just keeping as feet but we need to adhere to Board interface: length in feet as number, e.g. 5.10)
+    // Actually the interface says length: number; // feet
+    const finalLength = parseFloat(lengthFt) + (parseFloat(lengthIn || '0') / 12);
+
+    const newBoard: Board = {
+      id: `board_${Date.now()}`,
+      uid: user?.uid,
+      brand,
+      model,
+      length: finalLength,
+      width: 19.5, // default
+      thickness: 2.5, // default
+      volume,
+      boardType,
+    };
+
+    if (user?.uid) {
+      try {
+        await addBoardFirestore(user.uid, newBoard);
+      } catch (e) {
+        console.error("Failed to save board to firestore", e);
+      }
+    }
+    
+    addBoard(newBoard);
+    setIsSaving(false);
+    onSave();
+  };
 
   return (
     <div className="bg-background-dark min-h-screen text-text pb-24 relative">
        <header className="px-6 py-4 flex items-center justify-between sticky top-0 bg-background-dark z-20">
-         <button onClick={onBack} className="text-textMuted hover:text-text font-medium text-sm">Cancel</button>
+         <button onClick={onBack} disabled={isSaving} className="text-textMuted hover:text-text font-medium text-sm disabled:opacity-50">Cancel</button>
          <h1 className="text-lg font-bold">Add Board</h1>
-         <button onClick={onSave} className="text-primary font-bold text-sm">Save</button>
+         <button onClick={handleSave} disabled={isSaving || !brand || !model || !lengthFt} className="text-primary font-bold text-sm disabled:opacity-50">
+            {isSaving ? 'Saving...' : 'Save'}
+         </button>
        </header>
 
        <main className="px-6 mt-4 space-y-6">
@@ -30,11 +78,11 @@ export const AddBoardScreen: React.FC<AddBoardScreenProps> = ({ onBack, onSave }
          <div className="space-y-4">
            <div>
              <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block mb-2">Brand</label>
-             <input type="text" placeholder="e.g. Channel Islands" className="w-full bg-surface border-none rounded-xl p-4 text-text placeholder-slate-500 focus:ring-2 focus:ring-primary outline-none" />
+             <input type="text" value={brand} onChange={e => setBrand(e.target.value)} placeholder="e.g. Channel Islands" className="w-full bg-surface border-none rounded-xl p-4 text-text placeholder-slate-500 focus:ring-2 focus:ring-primary outline-none" />
            </div>
            <div>
              <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block mb-2">Model</label>
-             <input type="text" placeholder="e.g. Happy Everyday" className="w-full bg-surface border-none rounded-xl p-4 text-text placeholder-slate-500 focus:ring-2 focus:ring-primary outline-none" />
+             <input type="text" value={model} onChange={e => setModel(e.target.value)} placeholder="e.g. Happy Everyday" className="w-full bg-surface border-none rounded-xl p-4 text-text placeholder-slate-500 focus:ring-2 focus:ring-primary outline-none" />
            </div>
          </div>
 
@@ -43,9 +91,9 @@ export const AddBoardScreen: React.FC<AddBoardScreenProps> = ({ onBack, onSave }
            <div>
              <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block mb-2">Length</label>
              <div className="flex gap-2">
-               <input type="number" placeholder="5" className="w-full bg-surface border-none rounded-xl p-4 text-text placeholder-slate-500 focus:ring-2 focus:ring-primary outline-none text-center" />
+               <input type="number" value={lengthFt} onChange={e => setLengthFt(e.target.value)} placeholder="5" className="w-full bg-surface border-none rounded-xl p-4 text-text placeholder-slate-500 focus:ring-2 focus:ring-primary outline-none text-center" />
                <span className="self-center font-bold text-slate-600">'</span>
-               <input type="number" placeholder="10" className="w-full bg-surface border-none rounded-xl p-4 text-text placeholder-slate-500 focus:ring-2 focus:ring-primary outline-none text-center" />
+               <input type="number" value={lengthIn} onChange={e => setLengthIn(e.target.value)} placeholder="10" className="w-full bg-surface border-none rounded-xl p-4 text-text placeholder-slate-500 focus:ring-2 focus:ring-primary outline-none text-center" />
                <span className="self-center font-bold text-slate-600">"</span>
              </div>
            </div>
@@ -65,8 +113,12 @@ export const AddBoardScreen: React.FC<AddBoardScreenProps> = ({ onBack, onSave }
          <div>
            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block mb-2">Board Type</label>
            <div className="flex gap-3 overflow-x-auto py-2 hide-scrollbar">
-             {['Shortboard', 'Fish', 'Groveler', 'Step-up', 'Longboard', 'Mid-length'].map(type => (
-               <button key={type} className="px-4 py-2 bg-surface rounded-full text-sm font-bold text-textMuted hover:bg-primary hover:text-text transition-colors whitespace-nowrap">
+             {(['shortboard', 'fish', 'funboard', 'longboard', 'gun', 'foilboard'] as const).map(type => (
+               <button 
+                 key={type} 
+                 onClick={() => setBoardType(type)}
+                 className={`px-4 py-2 rounded-full text-sm font-bold capitalize transition-colors whitespace-nowrap ${boardType === type ? 'bg-primary text-text' : 'bg-surface text-textMuted hover:bg-primary/20 hover:text-text'}`}
+               >
                  {type}
                </button>
              ))}
