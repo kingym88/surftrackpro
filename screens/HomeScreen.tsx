@@ -56,8 +56,22 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
     }
     setShowSpotPicker(false);
     setSearchQuery('');
-    setShowSuggestions(false);
+    setTimeout(() => setShowSuggestions(false), 200); // small delay to allow click
   };
+
+  const toSurfSpot = (seed: typeof portugalSpots[0]): SurfSpot => ({
+    id: seed.id,
+    name: seed.name,
+    distance: '— km',
+    swellDirection: 'W',
+    height: '— m',
+    condition: 'FAIR',
+    image: '',
+    coordinates: { lat: seed.latitude, lng: seed.longitude },
+    region: seed.region,
+    country: seed.country,
+    breakProfile: seed.breakProfile
+  });
 
   const filteredSuggestions = searchQuery.length >= 1 
     ? portugalSpots.filter(s => s.name.toLowerCase().includes(searchQuery.toLowerCase())).slice(0, 5)
@@ -145,7 +159,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
           isLoadingForecast ? (
              <ForecastChartSkeleton />
           ) : (
-            <section onClick={() => { if (homeSpot) onNavigate(Screen.SPOT_DETAIL, { spot: homeSpot }); }} className="cursor-pointer group space-y-2">
+            <section onClick={() => { if (homeSpot) onNavigate(Screen.SPOT_DETAIL, { spot: toSurfSpot(homeSpot) }); }} className="cursor-pointer group space-y-2">
               {forecastError && (
                 <div className="bg-amber-900/40 rounded-lg p-2 text-amber-300 text-xs flex items-center gap-2">
                   <span className="material-icons-round text-sm">warning</span>
@@ -194,7 +208,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
         {homeSpotId && (
           <ForecastStrip
             forecasts={homeForecast ?? []}
-            onDaySelect={(day) => { if (homeSpot) onNavigate(Screen.SPOT_DETAIL, { spot: homeSpot }); }}
+            onDaySelect={(day) => { if (homeSpot) onNavigate(Screen.SPOT_DETAIL, { spot: toSurfSpot(homeSpot) }); }}
             isGuest={isGuest}
             onNavigate={onNavigate}
           />
@@ -249,7 +263,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
               if (!ndata) return null;
               
               return (
-                <div key={nid} onClick={() => { if (ndata) onNavigate(Screen.SPOT_DETAIL, { spot: ndata }); }} className="bg-surface border border-border rounded-lg p-4 flex items-center justify-between cursor-pointer hover:bg-surface hover:brightness-110 transition-colors">
+                <div key={nid} onClick={() => { if (ndata) onNavigate(Screen.SPOT_DETAIL, { spot: toSurfSpot(ndata) }); }} className="bg-surface border border-border rounded-lg p-4 flex items-center justify-between cursor-pointer hover:bg-surface hover:brightness-110 transition-colors">
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-12 rounded-lg overflow-hidden bg-primary/20 flex-shrink-0 flex items-center justify-center">
                       <span className="material-icons-round text-primary opacity-80">waves</span>

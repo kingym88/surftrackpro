@@ -31,8 +31,10 @@ function compassToDeg(c: string): number {
 // ─── Main scoring function ────────────────────────────────────────────────────
 export function computeSwellQuality(
   forecast: ForecastSnapshot,
-  profile: SpotBreakProfile,
+  profile: SpotBreakProfile | undefined,
 ): SwellQualityScore {
+  const safeProfile = profile || { breakType: 'beach', facingDirection: 'W', optimalSwellDirection: 'W-NW', optimalTidePhase: 'mid', optimalWindDirection: 'E' };
+  
   const reasons: string[] = [];
   let totalScore = 0;
 
@@ -40,8 +42,8 @@ export function computeSwellQuality(
   // Beach breaks typically ideal 1–3m; reef/point can handle bigger
   const h = forecast.waveHeight;
   let heightScore = 0;
-  const optimalMin = profile.breakType === 'reef' ? 1.0 : 0.8;
-  const optimalMax = profile.breakType === 'reef' ? 4.0 : 2.5;
+  const optimalMin = safeProfile.breakType === 'reef' ? 1.0 : 0.8;
+  const optimalMax = safeProfile.breakType === 'reef' ? 4.0 : 2.5;
 
   if (h >= optimalMin && h <= optimalMax) {
     heightScore = WEIGHTS.waveHeight;
@@ -83,7 +85,7 @@ export function computeSwellQuality(
   // ── 3. Wind Direction vs Break Orientation ──────────────────────────────────
   // Offshore wind = wind blowing from land to sea (grooms waves)
   // The spot's facingDirection is where waves come FROM, so offshore = opposite direction
-  const breakFacingDeg = compassToDeg(profile.facingDirection);
+  const breakFacingDeg = compassToDeg(safeProfile.facingDirection);
   const offshoreDeg = (breakFacingDeg + 180) % 360; // land side
   const windDiff = bearingDiff(forecast.windDirection, offshoreDeg);
   let windScore = 0;
@@ -106,7 +108,7 @@ export function computeSwellQuality(
   // ── 4. Swell Direction Alignment ───────────────────────────────────────────
   // Optimal swell direction is specified as a range like "W-NW"
   // Parse the first bearing from the optimal direction
-  const optSwellParts = profile.optimalSwellDirection.split('-');
+  const optSwellParts = safeProfile.optimalSwellDirection.split('-');
   const optSwellDeg = compassToDeg(optSwellParts[0].trim());
   const swellDiff = bearingDiff(forecast.swellDirection, optSwellDeg);
   let swellDirScore = 0;
@@ -136,12 +138,12 @@ export function computeSwellQuality(
   const currentTidePhase: 'low' | 'mid' | 'high' =
     hour % 12 < 3 ? 'low' : hour % 12 < 9 ? 'mid' : 'high';
 
-  if (profile.optimalTidePhase === 'any' || currentTidePhase === profile.optimalTidePhase) {
+  if (safeProfile.optimalTidePhase === 'any' || currentTidePhase === safeProfile.optimalTidePhase) {
     tideScore = WEIGHTS.tidePhase;
     reasons.push(`Tide phase (${currentTidePhase}) matches optimal for this break.`);
   } else {
     tideScore = WEIGHTS.tidePhase * 0.3;
-    reasons.push(`Tide phase (${currentTidePhase}) not ideal — optimal is ${profile.optimalTidePhase}.`);
+    reasons.push(`Tide phase (${currentTidePhase}) not ideal — optimal is ${safeProfile.optimalTidePhase}.`);
   }
   totalScore += tideScore;
 

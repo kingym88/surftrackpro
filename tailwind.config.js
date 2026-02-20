@@ -12,7 +12,10 @@ export default {
     extend: {
       colors: {
         primary: '#137fec',
-        // Light Mode
+        'background-light': '#f6f7f8',
+        'background-dark': '#101922',
+        'card-dark': '#16202a',
+        'accent-teal': '#2dd4bf',
         surface: 'var(--color-surface)',
         background: 'var(--color-background)',
         text: 'var(--color-text)',
