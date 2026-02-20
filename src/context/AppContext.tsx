@@ -6,6 +6,7 @@ import { Geolocation } from '@capacitor/geolocation';
 import { Capacitor } from '@capacitor/core';
 import { Preferences } from '@capacitor/preferences';
 import { fetchOpenMeteoForecast } from '@/src/services/openMeteo';
+import { fetchTidePredictions } from '@/src/services/tides';
 import { getUserProfile } from '@/src/services/firestore';
 
 // ─── State shape ──────────────────────────────────────────────────────────────
@@ -248,9 +249,14 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, isGuest, uid
           spotsToFetch.map(async (spotId) => {
             const spotData = portugalSpots.find(s => s.id === spotId);
             if (!spotData) return;
-            // Fetch live OpenMeteo forecast if not cached or we need fresh data
-            const live = await fetchOpenMeteoForecast(spotData.latitude, spotData.longitude);
+            // Fetch live OpenMeteo forecast and tides concurrently
+            const todayStr = new Date().toISOString().split('T')[0];
+            const [live, tideData] = await Promise.all([
+              fetchOpenMeteoForecast(spotData.latitude, spotData.longitude),
+              fetchTidePredictions(spotData.latitude, spotData.longitude, todayStr),
+            ]);
             dispatch({ type: 'SET_FORECAST', payload: { spotId, data: live } });
+            dispatch({ type: 'SET_TIDES', payload: { spotId, data: tideData } });
           })
         );
       } catch (e) {
