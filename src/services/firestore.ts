@@ -13,6 +13,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import type { SurfSpot, SessionLog, Board, ForecastSnapshot, TidePoint } from '@/types';
+import { portugalSpots } from '@/src/data/portugalSpots';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface UserProfile {
@@ -147,10 +148,10 @@ export async function getPrecomputedForecast(
 export async function setPrecomputedForecast(
   spotId: string,
   data: ForecastSnapshot[],
+  runAt: Timestamp,
+  validTo: Timestamp
 ): Promise<void> {
   const runId = Date.now().toString();
-  const runAt = Timestamp.now();
-  const validTo = Timestamp.fromDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
   await setDoc(doc(db, 'precomputed_forecasts', spotId, 'runs', runId), {
     data,
     runAt,
@@ -163,26 +164,31 @@ export async function getNearestSpots(
   baseSpotId: string,
   limit: number = 5,
 ): Promise<SurfSpot[]> {
-  // This implementation fetches all spots and sorts by distance client-side.
-  // For production, a geospatial query (GeoFirestore) would be more efficient.
-  const baseSnap = await getDoc(doc(db, 'spots', baseSpotId));
-  if (!baseSnap.exists()) return [];
+  const baseSpot = portugalSpots.find(s => s.id === baseSpotId);
+  if (!baseSpot) return [];
 
-  const baseData = baseSnap.data() as SurfSpot;
-  const baseLat = baseData.coordinates?.lat ?? 0;
-  const baseLng = baseData.coordinates?.lng ?? 0;
+  const others = portugalSpots.filter(s => s.id !== baseSpotId);
 
-  const allSpots = await getSpots();
-  const others = allSpots.filter(s => s.id !== baseSpotId);
-
-  // Haversine distance
   const withDistance = others.map(s => ({
     spot: s,
-    dist: haversine(baseLat, baseLng, s.coordinates?.lat ?? 0, s.coordinates?.lng ?? 0),
+    dist: haversine(baseSpot.latitude, baseSpot.longitude, s.latitude, s.longitude),
   }));
 
   withDistance.sort((a, b) => a.dist - b.dist);
-  return withDistance.slice(0, limit).map(w => w.spot);
+  
+  // Transform PortugalSpotSeed to SurfSpot
+  return withDistance.slice(0, limit).map(w => ({
+    id: w.spot.id,
+    name: w.spot.name,
+    distance: `${w.dist.toFixed(1)} km`,
+    swellDirection: '', 
+    height: '',
+    condition: 'FAIR',
+    image: '',
+    coordinates: { lat: w.spot.latitude, lng: w.spot.longitude },
+    region: w.spot.region,
+    country: w.spot.country
+  }));
 }
 
 function haversine(lat1: number, lon1: number, lat2: number, lon2: number): number {

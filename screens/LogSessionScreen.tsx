@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Screen } from '../types';
 import type { SessionLog, SurfSpot, Board } from '../types';
 import { useApp } from '@/src/context/AppContext';
 import { useAuth } from '@/src/context/AuthContext';
 import { useToast } from '@/src/context/ToastContext';
+import { GuestGate } from '@/src/components/GuestGate';
+import { addSession as addSessionFirestore } from '@/src/services/firestore';
 
 interface LogSessionScreenProps {
   onBack: () => void;
@@ -11,7 +13,7 @@ interface LogSessionScreenProps {
 }
 
 export const LogSessionScreen: React.FC<LogSessionScreenProps> = ({ onBack, onComplete }) => {
-  const { spots, quiver, addSession, forecasts } = useApp();
+  const { spots, quiver, addSession, forecasts, isGuest } = useApp();
   const { user } = useAuth();
   const { addToast } = useToast();
   
@@ -22,10 +24,21 @@ export const LogSessionScreen: React.FC<LogSessionScreenProps> = ({ onBack, onCo
   const [durationHours, setDurationHours] = useState(1.5);
   const [notes, setNotes] = useState('');
   
+  // Auto-filled conditions state
+  const [waveHeight, setWaveHeight] = useState('');
+  const [wavePeriod, setWavePeriod] = useState('');
+
   const selectedSpot = spots.find(s => s.id === selectedSpotId);
   const recentForecast = (selectedSpot && forecasts[selectedSpotId]) ? forecasts[selectedSpotId][0] : null;
 
-  const handleComplete = () => {
+  useEffect(() => {
+    if (recentForecast) {
+      setWaveHeight(recentForecast.waveHeight.toFixed(1));
+      setWavePeriod(recentForecast.wavePeriod.toFixed(0));
+    }
+  }, [recentForecast, selectedSpotId]);
+
+  const handleComplete = async () => {
     if (!selectedSpot || !selectedBoardId) return;
 
     const newSession: SessionLog = {
@@ -38,7 +51,7 @@ export const LogSessionScreen: React.FC<LogSessionScreenProps> = ({ onBack, onCo
       duration: durationHours * 60,
       boardId: selectedBoardId,
       rating,
-      height: recentForecast?.waveHeight.toString() || '0',
+      height: waveHeight || (recentForecast?.waveHeight.toString() || '0'),
       image: selectedSpot.image || '',
       notes,
       conditionsSnapshot: recentForecast ? {
@@ -46,15 +59,35 @@ export const LogSessionScreen: React.FC<LogSessionScreenProps> = ({ onBack, onCo
         wavePeriod: recentForecast.wavePeriod,
         windSpeed: recentForecast.windSpeed,
         windDirection: recentForecast.windDirection,
-        tide: 0, // Placeholder
+        tide: 0, 
       } : undefined,
     };
 
+    if (user?.uid) {
+      try {
+        await addSessionFirestore(user.uid, newSession);
+      } catch (e) {
+        console.error("Failed to save to firestore", e);
+      }
+    }
+    
     addSession(newSession);
-    // logFirebaseEvent('log_session', { spotId: selectedSpot.id, rating });
     addToast('Session logged successfully!', 'success');
     onComplete(newSession);
   };
+
+  if (isGuest) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center p-8 h-screen bg-background">
+        <GuestGate featureName="Log your surf sessions">
+          <div className="h-64 w-full" />
+        </GuestGate>
+        <button onClick={onBack} className="mt-8 px-6 py-2 rounded-full border border-border text-textMuted hover:text-text transition-colors">
+          Back
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-background min-h-screen text-text font-sans relative selection:bg-primary/20">
@@ -80,8 +113,8 @@ export const LogSessionScreen: React.FC<LogSessionScreenProps> = ({ onBack, onCo
              <h1 className="text-3xl font-display font-bold tracking-tight text-text mb-2">Where did you surf?</h1>
              <p className="text-textMuted mb-8 text-sm">Select a spot to link real-time environmental data.</p>
              
-             <div className="space-y-3">
-               {spots.slice(0, 5).map(spot => (
+             <div className="space-y-3 max-h-96 overflow-y-auto">
+               {spots.map(spot => (
                  <div 
                    key={spot.id} 
                    onClick={() => setSelectedSpotId(spot.id)}
@@ -89,7 +122,7 @@ export const LogSessionScreen: React.FC<LogSessionScreenProps> = ({ onBack, onCo
                  >
                    <div className="flex items-center gap-4">
                      <div className="w-12 h-12 rounded-lg bg-background overflow-hidden border border-border">
-                       <img src={spot.image || 'https://lh3.googleusercontent.com/aida-public/AB6AXuDt812q345B5t6u7v8w9x0y1z2A3B4C5D6E7F8G9H0I1J2K3L4M5N6O7P8Q9R0S1T2U3V4W5X6Y7Z8a9b0c1d2e3f4g'} alt="" className="w-full h-full object-cover" />
+                       <img src={spot.image || 'https://images.unsplash.com/photo-1502680390469-be75c86b636f?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80'} alt="" className="w-full h-full object-cover" />
                      </div>
                      <div>
                        <p className="font-bold text-text">{spot.name}</p>
@@ -99,15 +132,37 @@ export const LogSessionScreen: React.FC<LogSessionScreenProps> = ({ onBack, onCo
                    {selectedSpotId === spot.id && <span className="material-icons-round text-primary">check_circle</span>}
                  </div>
                ))}
-               <button className="w-full p-4 rounded-xl border border-dashed border-border text-primary font-bold flex items-center justify-center gap-2 hover:bg-primary/5 transition-colors mt-4">
-                 <span className="material-icons-round">add</span>
-                 LOG CUSTOM SPOT
-               </button>
              </div>
+
+             {selectedSpotId && (
+               <div className="mt-6 bg-surface p-4 rounded-xl border border-border">
+                  <h3 className="text-sm font-bold text-text mb-2">Conditions Preview</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs text-textMuted">Wave Height (m)</label>
+                      <input 
+                        type="number" 
+                        value={waveHeight}
+                        onChange={(e) => setWaveHeight(e.target.value)}
+                        className="w-full bg-background text-text rounded p-2 mt-1 border border-border outline-none focus:border-primary"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-textMuted">Wave Period (s)</label>
+                      <input 
+                        type="number" 
+                        value={wavePeriod}
+                        onChange={(e) => setWavePeriod(e.target.value)}
+                        className="w-full bg-background text-text rounded p-2 mt-1 border border-border outline-none focus:border-primary"
+                      />
+                    </div>
+                  </div>
+               </div>
+             )}
            </div>
          )}
 
-         {/* STEP 2: Session Details */}
+         {/* STEP 2: Session Details Board */}
          {step === 2 && (
            <div className="animate-fadeIn">
              <h1 className="text-3xl font-display font-bold tracking-tight text-text mb-8">How was it?</h1>
@@ -138,7 +193,7 @@ export const LogSessionScreen: React.FC<LogSessionScreenProps> = ({ onBack, onCo
                <input 
                  type="range" 
                  min="0.5" 
-                 max="5" 
+                 max="4" 
                  step="0.5" 
                  value={durationHours}
                  onChange={(e) => setDurationHours(parseFloat(e.target.value))}
@@ -146,58 +201,32 @@ export const LogSessionScreen: React.FC<LogSessionScreenProps> = ({ onBack, onCo
                />
                <div className="flex justify-between text-[10px] text-textMuted mt-2 font-bold">
                  <span>30m</span>
-                 <span>5h+</span>
+                 <span>4h</span>
                </div>
+             </section>
+
+             {/* Board Selector */}
+             <section className="mb-8">
+                <h2 className="text-[10px] font-bold uppercase tracking-widest text-textMuted mb-2">Quiver Used</h2>
+                <select 
+                  className="w-full bg-slate-800 text-white rounded-xl p-3 border border-slate-700 outline-none focus:border-cyan-500"
+                  value={selectedBoardId}
+                  onChange={(e) => setSelectedBoardId(e.target.value)}
+                >
+                  <option value="">Select a board...</option>
+                  {quiver.map(b => (
+                    <option key={b.id} value={b.id}>{b.brand} {b.model} {b.volume}L</option>
+                  ))}
+                </select>
              </section>
            </div>
          )}
 
-         {/* STEP 3: Quiver & Notes */}
+         {/* STEP 3: Notes */}
          {step === 3 && (
            <div className="animate-fadeIn">
              <h1 className="text-3xl font-display font-bold tracking-tight text-text mb-8">Almost done.</h1>
              
-             {/* Board Selection */}
-             <section className="mb-8">
-               <div className="flex justify-between items-end mb-4">
-                 <h2 className="text-[10px] font-bold uppercase tracking-widest text-textMuted">Quiver Used</h2>
-                 <button className="text-[10px] font-bold bg-surface text-text px-3 py-1 rounded-full border border-border">ADD NEW</button>
-               </div>
-               <div className="flex gap-3 overflow-x-auto hide-scrollbar pb-2">
-                 {quiver.length > 0 ? quiver.map(board => (
-                   <div 
-                     key={board.id}
-                     onClick={() => setSelectedBoardId(board.id)}
-                     className={`flex-shrink-0 w-32 p-4 rounded-xl flex flex-col items-center text-center transition-all cursor-pointer ${selectedBoardId === board.id ? 'bg-primary/10 border-2 border-primary' : 'bg-surface border border-border opacity-70 hover:opacity-100'}`}
-                   >
-                     <div className={`w-12 h-12 rounded-full mb-3 flex items-center justify-center ${selectedBoardId === board.id ? 'bg-primary text-white' : 'bg-background text-textMuted'}`}>
-                       <span className="material-icons-round">surfing</span>
-                     </div>
-                     <p className="text-sm font-bold text-text truncate w-full">{board.brand} {board.model}</p>
-                     <p className="text-[10px] uppercase font-medium text-textMuted truncate w-full mt-0.5">{board.boardType} {board.length}'</p>
-                   </div>
-                 )) : (
-                   <div className="text-sm text-textMuted italic p-4 text-center w-full border border-dashed border-border rounded-xl">
-                     No boards in your quiver yet.
-                   </div>
-                 )}
-               </div>
-             </section>
-
-             {/* Auto-filled conditions preview */}
-             {recentForecast && (
-               <section className="mb-8 bg-surface p-4 rounded-xl border border-border">
-                 <div className="flex items-center gap-2 mb-3">
-                   <span className="material-icons-round text-primary text-sm">sync</span>
-                   <p className="text-[10px] font-bold text-textMuted uppercase">Syncing Conditions for {selectedSpot?.name}</p>
-                 </div>
-                 <div className="flex justify-between text-sm">
-                   <span className="font-bold">{recentForecast.waveHeight}ft @ {recentForecast.wavePeriod}s</span>
-                   <span className="text-primary font-medium">{recentForecast.windSpeed}kts {recentForecast.windDirection}°</span>
-                 </div>
-               </section>
-             )}
-
              {/* Personal Notes */}
              <section className="mb-8">
                <h2 className="text-[10px] font-bold uppercase tracking-widest text-textMuted mb-4">Personal Notes</h2>
@@ -216,9 +245,9 @@ export const LogSessionScreen: React.FC<LogSessionScreenProps> = ({ onBack, onCo
            <div className="max-w-md mx-auto">
              {step < 3 ? (
                <button 
-                 disabled={step === 1 && !selectedSpotId}
+                 disabled={(step === 1 && !selectedSpotId) || (step === 2 && !selectedBoardId)}
                  onClick={() => setStep(step + 1)} 
-                 className={`w-full font-bold py-4 rounded-full shadow-soft transition-all flex items-center justify-center gap-2 ${step===1 && !selectedSpotId ? 'bg-surface text-textMuted cursor-not-allowed' : 'bg-text text-background hover:scale-[1.02] active:scale-95'}`}
+                 className={`w-full font-bold py-4 rounded-full shadow-soft transition-all flex items-center justify-center gap-2 ${((step===1 && !selectedSpotId) || (step===2 && !selectedBoardId)) ? 'bg-surface text-textMuted cursor-not-allowed' : 'bg-text text-background hover:scale-[1.02] active:scale-95'}`}
                >
                  NEXT STEP
                  <span className="material-icons-round text-sm">arrow_forward_ios</span>
@@ -227,7 +256,7 @@ export const LogSessionScreen: React.FC<LogSessionScreenProps> = ({ onBack, onCo
                <button 
                  onClick={handleComplete} 
                  disabled={!selectedBoardId}
-                 className={`w-full font-bold py-4 rounded-full shadow-soft transition-all flex items-center justify-center gap-2 ${!selectedBoardId ? 'bg-surface text-textMuted cursor-not-allowed' : 'bg-primary text-white hover:scale-[1.02] active:scale-95'}`}
+                 className={`w-full font-bold py-4 rounded-full shadow-soft transition-all flex items-center justify-center gap-2 block ${!selectedBoardId ? 'bg-surface text-textMuted cursor-not-allowed' : 'bg-primary text-white hover:scale-[1.02] active:scale-95'}`}
                >
                  <span className="material-icons-round text-lg">check_circle</span>
                  SAVE SESSION

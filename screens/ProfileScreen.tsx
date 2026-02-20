@@ -2,19 +2,24 @@ import React, { useMemo } from 'react';
 import { Screen } from '../types';
 import { useAuth } from '@/src/context/AuthContext';
 import { useApp } from '@/src/context/AppContext';
+import { useTheme } from '@/src/context/ThemeContext';
 
 interface ProfileScreenProps {
   onNavigate: (screen: Screen) => void;
 }
 
 export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate }) => {
-  const { user } = useAuth();
-  const { sessions, quiver } = useApp();
+  const { user, signOut } = useAuth();
+  const { sessions, quiver, isGuest } = useApp();
+  const { theme, toggleTheme } = useTheme();
 
   // Aggregate user stats
   const stats = useMemo(() => {
+    if (isGuest) {
+      return { totalSessions: '--', lastSurfDays: '--', topSpotName: '--', topSpotCount: '--', boardUsage: [], wavesLogged: '--', spotsVisited: '--' };
+    }
+
     const totalSessions = sessions.length;
-    // Calculate days since last surf
     let lastSurfDays = '--';
     if (totalSessions > 0) {
        const latestSession = Math.max(...sessions.map(s => s.timestamp));
@@ -29,13 +34,15 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate }) => {
     }, {} as Record<string, number>);
     
     let topSpotName = '--';
-    let topSpotCount = 0;
+    let topSpotCount: number | string = 0;
     Object.entries(spotCounts).forEach(([name, count]) => {
-        if (count > topSpotCount) {
+        if (count > (topSpotCount as number)) {
             topSpotCount = count;
             topSpotName = name;
         }
     });
+
+    const spotsVisited = Object.keys(spotCounts).length;
 
     // Board Usage breakdown
     const boardCounts = sessions.reduce((acc, s) => {
@@ -59,31 +66,38 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate }) => {
       .sort((a,b) => b.count - a.count)
       .slice(0, 3); // Top 3
 
-    return { totalSessions, lastSurfDays, topSpotName, topSpotCount, boardUsage };
-  }, [sessions, quiver]);
+    return { totalSessions, lastSurfDays, topSpotName, topSpotCount, boardUsage, wavesLogged: '--', spotsVisited };
+  }, [sessions, quiver, isGuest]);
 
 
   // Find last 2 epic sessions (rating >= 4)
   const epicSessions = useMemo(() => {
+     if (isGuest) return [];
      return sessions
         .filter(s => s.rating >= 4)
         .sort((a,b) => b.timestamp - a.timestamp)
         .slice(0, 2);
-  }, [sessions]);
+  }, [sessions, isGuest]);
 
 
   return (
-    <div className="pb-24 bg-background min-h-screen text-text font-sans">
+    <div className="pb-24 bg-background min-h-screen text-text font-sans selection:bg-primary/20">
       {/* Profile Header Section */}
       <header className="px-6 pt-6 pb-4">
         <div className="flex items-center space-x-4">
           <div className="relative">
-            <div className="w-20 h-20 rounded-full border border-border flex items-center justify-center bg-surface overflow-hidden shadow-sm">
-                <span className="material-icons-round text-4xl text-textMuted">person</span>
-            </div>
-            <div className="absolute -bottom-1 -right-1 bg-primary text-white p-1 rounded-full border-2 border-background shadow-sm">
-              <span className="material-icons-round text-[12px]">verified</span>
-            </div>
+            {isGuest ? (
+              <span className="material-icons-round text-7xl text-slate-500">account_circle</span>
+            ) : (
+              <>
+                <div className="w-20 h-20 rounded-full border border-border flex items-center justify-center bg-surface overflow-hidden shadow-sm">
+                    <span className="material-icons-round text-4xl text-textMuted">person</span>
+                </div>
+                <div className="absolute -bottom-1 -right-1 bg-primary text-white p-1 rounded-full border-2 border-background shadow-sm">
+                  <span className="material-icons-round text-[12px]">verified</span>
+                </div>
+              </>
+            )}
           </div>
           <div className="flex-1">
             <h1 className="text-2xl font-display font-bold tracking-tight text-text">
@@ -93,7 +107,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate }) => {
               <span className="material-icons-round text-xs mr-1 text-primary">location_on</span>
               {user ? 'Lisbon, PT' : 'Local Break'}
             </div>
-            {user && (
+            {isGuest ? (
+              <button onClick={() => onNavigate(Screen.SIGN_UP)} className="mt-2 text-xs font-bold uppercase tracking-wider bg-primary text-white px-4 py-2 rounded-full border border-primary hover:bg-primary/80 transition-colors shadow-sm">
+                Create your profile
+              </button>
+            ) : (
               <button className="mt-2 text-xs font-bold uppercase tracking-wider bg-surface text-text px-3 py-1.5 rounded-full border border-border hover:bg-border transition-colors shadow-sm">
                 Edit Profile
               </button>
@@ -108,12 +126,12 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate }) => {
             <p className="text-2xl font-black text-primary">{stats.totalSessions}</p>
           </div>
           <div className="bg-surface p-3 rounded-xl border border-border text-center shadow-sm">
-            <p className="text-[10px] text-textMuted font-bold uppercase tracking-wider">Goal</p>
-            <p className="text-2xl font-black text-text">100</p>
+            <p className="text-[10px] text-textMuted font-bold uppercase tracking-wider">Waves</p>
+            <p className="text-2xl font-black text-text">{stats.wavesLogged}</p>
           </div>
           <div className="bg-surface p-3 rounded-xl border border-border text-center shadow-sm">
-            <p className="text-[10px] text-textMuted font-bold uppercase tracking-wider">Last Surf</p>
-            <p className="text-2xl font-black text-text border-slate-700/50">{stats.lastSurfDays}</p>
+            <p className="text-[10px] text-textMuted font-bold uppercase tracking-wider">Spots Visited</p>
+            <p className="text-2xl font-black text-text border-slate-700/50">{stats.spotsVisited}</p>
           </div>
         </div>
       </header>
@@ -140,12 +158,14 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate }) => {
               <span className="material-icons-round text-accent2 text-lg">water</span>
             </div>
             <p className="text-[10px] uppercase font-bold tracking-wider text-textMuted mb-0.5">Avg Height</p>
-            <h3 className="text-base font-bold text-text">3 - 5 FT</h3>
-            <div className="flex items-center space-x-1 mt-1">
-              <div className="h-1.5 w-full bg-background rounded-full overflow-hidden border border-border">
-                <div className="h-full bg-accent2" style={{ width: '65%' }}></div>
+            <h3 className="text-base font-bold text-text">{isGuest ? '--' : '3 - 5 FT'}</h3>
+            {!isGuest && (
+              <div className="flex items-center space-x-1 mt-1">
+                <div className="h-1.5 w-full bg-background rounded-full overflow-hidden border border-border">
+                  <div className="h-full bg-accent2" style={{ width: '65%' }}></div>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
 
@@ -207,7 +227,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate }) => {
                  <div 
                     key={session.id}
                     onClick={() => {
-                        // Normally this would pass the session object context. Mock navigation for now.
                         onNavigate(Screen.SESSION_DETAIL);
                     }} 
                     className="min-w-[280px] h-44 relative rounded-2xl overflow-hidden group cursor-pointer border border-border shadow-sm"
@@ -237,6 +256,39 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate }) => {
           </section>
       )}
 
+      {/* Settings Section */}
+      <section className="px-6 py-4 mb-2">
+         <h2 className="text-lg font-bold text-text font-display mb-4">Settings</h2>
+         <div className="bg-surface rounded-2xl border border-border overflow-hidden">
+            <div className="p-4 flex justify-between items-center border-b border-border">
+               <div className="flex items-center gap-3">
+                  <span className="material-icons-round text-textMuted">{theme === 'dark' ? 'dark_mode' : 'light_mode'}</span>
+                  <span className="text-sm font-bold text-text">Dark Mode</span>
+               </div>
+               <button 
+                  onClick={toggleTheme}
+                  className={`w-12 h-6 rounded-full p-1 transition-colors ${theme === 'dark' ? 'bg-primary' : 'bg-slate-300'}`}
+               >
+                  <div className={`w-4 h-4 rounded-full bg-white transition-transform ${theme === 'dark' ? 'translate-x-6' : 'translate-x-0'}`}></div>
+               </button>
+            </div>
+         </div>
+      </section>
+
+      {/* Sign Out */}
+      {!isGuest && (
+        <div className="px-6 py-4">
+           <button 
+              onClick={() => {
+                 signOut();
+                 onNavigate(Screen.HOME);
+              }} 
+              className="w-full bg-red-500/10 text-red-500 font-bold py-4 rounded-full shadow-sm hover:bg-red-500/20 transition-colors"
+           >
+              SIGN OUT
+           </button>
+        </div>
+      )}
     </div>
   );
 };

@@ -2,6 +2,10 @@ import React, { createContext, useContext, useReducer, useCallback, useEffect } 
 import type { SurfSpot, SessionLog, Board, ForecastSnapshot, TidePoint, SwellQualityScore, GeminiInsight } from '@/types';
 import { dummySpots, dummyForecast, dummyTides } from '@/src/data/guestDummyData';
 import { getNearestSpots, portugalSpots } from '@/src/data/portugalSpots';
+import { Geolocation } from '@capacitor/geolocation';
+import { Capacitor } from '@capacitor/core';
+import { Preferences } from '@capacitor/preferences';
+import { fetchOpenMeteoForecast } from '@/src/services/openMeteo';
 
 // ─── State shape ──────────────────────────────────────────────────────────────
 interface AppState {
@@ -140,12 +144,84 @@ interface AppProviderProps {
 export const AppProvider: React.FC<AppProviderProps> = ({ children, isGuest }) => {
   const [state, dispatch] = useReducer(reducer, initialState);
 
-  // Load guest data on first mount if not logged in
+  // Load guest data or initial forecasts
   useEffect(() => {
-    if (isGuest) {
-      dispatch({ type: 'LOAD_GUEST_DATA' });
+    async function initApp() {
+      if (isGuest) {
+        dispatch({ type: 'LOAD_GUEST_DATA' });
+        
+        // Load persisted guest data
+        const { value: sess } = await Preferences.get({ key: 'guest_temp_sessions' });
+        if (sess) dispatch({ type: 'SET_SESSIONS', payload: JSON.parse(sess) });
+        
+        const { value: quiv } = await Preferences.get({ key: 'guest_temp_boards' });
+        if (quiv) dispatch({ type: 'SET_QUIVER', payload: JSON.parse(quiv) });
+      } else {
+        dispatch({ type: 'SET_SPOTS', payload: portugalSpots });
+        // Attempt geolocation if native
+        let lat = 0, lng = 0;
+        if (Capacitor.isNativePlatform()) {
+          try {
+            const permission = await Geolocation.checkPermissions();
+            if (permission.location !== 'granted') {
+              await Geolocation.requestPermissions();
+            }
+            const pos = await Geolocation.getCurrentPosition();
+            lat = pos.coords.latitude;
+            lng = pos.coords.longitude;
+          } catch (e) {
+            console.error('Geolocation failed', e);
+          }
+        }
+        
+        // Let's rely on state.homeSpotId + state.nearbySpotIds for which spots to fetch
+        // (This effect triggers when isGuest changes, we will handle fetching in a separate effect below depending on spots)
+      }
     }
+    initApp();
   }, [isGuest]);
+
+  // Fetch forecast for homeSpotId and nearbySpotIds when they change, for logged in users
+  useEffect(() => {
+    if (isGuest) return;
+    async function fetchAllForecasts() {
+      if (!state.homeSpotId) return;
+      
+      const spotsToFetch = [state.homeSpotId, ...state.nearbySpotIds];
+      
+      dispatch({ type: 'SET_LOADING_FORECAST', payload: true });
+      dispatch({ type: 'SET_FORECAST_ERROR', payload: null });
+      
+      try {
+        await Promise.all(
+          spotsToFetch.map(async (spotId) => {
+            const spotData = portugalSpots.find(s => s.id === spotId);
+            if (!spotData) return;
+            // Fetch live OpenMeteo forecast if not cached or we need fresh data
+            const live = await fetchOpenMeteoForecast(spotData.latitude, spotData.longitude);
+            dispatch({ type: 'SET_FORECAST', payload: { spotId, data: live } });
+          })
+        );
+      } catch (e) {
+        dispatch({ type: 'SET_FORECAST_ERROR', payload: 'Failed to fully load forecasts. Data may be outdated.' });
+      } finally {
+        dispatch({ type: 'SET_LOADING_FORECAST', payload: false });
+      }
+    }
+    
+    fetchAllForecasts();
+  }, [isGuest, state.homeSpotId, state.nearbySpotIds]);
+
+  // Persist sessions and quiver to Preferences
+  useEffect(() => {
+    const saveState = async () => {
+      const sessKey = isGuest ? 'guest_temp_sessions' : 'user_sessions';
+      const quivKey = isGuest ? 'guest_temp_boards' : 'user_quiver';
+      await Preferences.set({ key: sessKey, value: JSON.stringify(state.sessions) });
+      await Preferences.set({ key: quivKey, value: JSON.stringify(state.quiver) });
+    };
+    saveState();
+  }, [state.sessions, state.quiver, isGuest]);
 
   const addSession = useCallback(
     (session: SessionLog) => dispatch({ type: 'ADD_SESSION', payload: session }),

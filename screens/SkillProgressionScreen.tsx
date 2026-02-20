@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '@/src/context/AppContext';
 import { getGeminiInsight } from '@/src/services/geminiInsight';
 import { GuestGate } from '@/src/components/GuestGate';
+import { portugalSpots } from '@/src/data/portugalSpots';
 import {
   LineChart,
   Line,
@@ -17,10 +18,12 @@ interface SkillProgressionScreenProps {
 }
 
 export const SkillProgressionScreen: React.FC<SkillProgressionScreenProps> = ({ onBack }) => {
-  const { sessions } = useApp();
+  const { isGuest, sessions, homeSpotId, forecasts, preferredWaveHeight } = useApp();
   const [timeframe, setTimeframe] = useState<'30' | '90' | 'ALL'>('30');
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
   const [isLoadingAnalysis, setIsLoadingAnalysis] = useState(false);
+
+  const homeSpot = useMemo(() => portugalSpots.find(s => s.id === homeSpotId), [homeSpotId]);
 
   // Filter sessions
   const filteredSessions = useMemo(() => {
@@ -39,7 +42,6 @@ export const SkillProgressionScreen: React.FC<SkillProgressionScreenProps> = ({ 
     const total = filteredSessions.length;
     const topSpeed = Math.max(...filteredSessions.map(s => s.topSpeed || 0));
     const totalDuration = filteredSessions.reduce((acc, s) => acc + (s.duration || 0), 0);
-    // Rough mockup calculation for avg wave time
     const avgWaveTime = totalDuration > 0 ? (totalDuration / total) * 0.1 : 0; 
     const bestScore = Math.max(...filteredSessions.map(s => s.rating));
     return { 
@@ -50,32 +52,54 @@ export const SkillProgressionScreen: React.FC<SkillProgressionScreenProps> = ({ 
     };
   }, [filteredSessions]);
 
-  // Chart Data
-  const chartData = useMemo(() => {
-    // Group by day for simple progression over time based on ratings
-    const grouped = [...filteredSessions].sort((a, b) => a.timestamp - b.timestamp).map(s => {
-       const d = new Date(s.timestamp);
-       return {
-          date: `${d.getMonth()+1}/${d.getDate()}`,
-          rating: s.rating * 20, // Scale 1-5 to 0-100 for graph aesthetics
-          waves: s.waveCount || Math.floor(Math.random() * 15) + 5 // mock wave count if missing
-       };
-    });
-    return grouped;
+  // 9.1 & 9.2 Compute rolling score
+  const skillOverTime = useMemo(() => {
+     // Group sessions by date
+     const groupedByDate: Record<string, { ratings: number[], waveHeights: number[], count: number }> = {};
+     filteredSessions.forEach(s => {
+       const dateStr = new Date(s.timestamp).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
+       if (!groupedByDate[dateStr]) groupedByDate[dateStr] = { ratings: [], waveHeights: [], count: 0 };
+       groupedByDate[dateStr].ratings.push(s.rating);
+       groupedByDate[dateStr].waveHeights.push(parseFloat(s.height) || 0);
+       groupedByDate[dateStr].count += 1;
+     });
+
+     const sortedDates = Object.keys(groupedByDate).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+     
+     const result: Array<{ date: string; score: number }> = [];
+     let rollingScore = 50; // default starting point
+     
+     sortedDates.forEach(date => {
+       const group = groupedByDate[date];
+       const avgRating = group.ratings.reduce((a,b) => a+b,0) / group.count; // 1-5
+       const maxHt = Math.max(...group.waveHeights); // mostly 0.5 - 3.0
+       
+       // complex formula based on frequency (count), rating, and wave height
+       const bump = (avgRating - 3) * 5 + (maxHt > 1.5 ? 5 : 0) + (group.count > 1 ? 5 : 0);
+       rollingScore = Math.min(100, Math.max(0, rollingScore + bump));
+       
+       result.push({
+         date,
+         score: Math.round(rollingScore)
+       });
+     });
+     
+     return result;
   }, [filteredSessions]);
 
-  // Fetch AI Coaching
+  // 9.3 Fetch AI Coaching
   useEffect(() => {
       const getCoaching = async () => {
-         if (filteredSessions.length === 0) return;
+         if (filteredSessions.length === 0 || !homeSpotId || !homeSpot || isGuest) return;
          setIsLoadingAnalysis(true);
          try {
-             // Basic prompt passing session metrics
-             const request = `I am a surfer. In the last ${timeframe} days, I had ${stats.total} sessions. 
-             My best session rating was ${stats.bestScore}/5. My top speed was ${stats.topSpeed}km/h. 
-             Provide a highly encouraging 3-sentence coach analysis and one specific recommendation for what to practice next.`;
-             const result = await getGeminiInsight([{ role: 'user', content: request }], undefined, undefined, undefined);
-             setAiAnalysis(result.summary || "Keep up the good work! Getting in the water is half the battle.");
+             const result = await getGeminiInsight(
+               forecasts[homeSpotId] || [], 
+               homeSpot.breakProfile || {} as any, 
+               filteredSessions, 
+               preferredWaveHeight || { min: 0.5, max: 3.0 }
+             );
+             setAiAnalysis(result.summary);
          } catch(e) {
              console.log(e);
          } finally {
@@ -85,94 +109,90 @@ export const SkillProgressionScreen: React.FC<SkillProgressionScreenProps> = ({ 
       
       const timeoutId = setTimeout(getCoaching, 500); // debounce slightly
       return () => clearTimeout(timeoutId);
-  }, [stats.total, timeframe]);
+  }, [filteredSessions, homeSpotId, homeSpot, forecasts, preferredWaveHeight, isGuest]);
 
 
   return (
-    <div className="pb-20 min-h-screen bg-background">
+    <div className="pb-20 min-h-screen bg-background relative selection:bg-primary/20">
       {/* Header Navigation */}
       <nav className="px-6 py-4 flex items-center justify-between sticky top-0 bg-background/80 backdrop-blur-md z-40 border-b border-border shadow-sm">
-        <button onClick={onBack} className="w-10 h-10 flex items-center justify-center rounded-full bg-surface border border-border text-textMuted hover:text-text transition-colors">
+        <button onClick={onBack} className="w-10 h-10 flex items-center justify-center rounded-full bg-surface border border-border text-text hover:bg-surface/80 transition-colors">
           <span className="material-icons-round text-lg">arrow_back_ios_new</span>
         </button>
-        <h1 className="text-xl font-bold tracking-tight text-text font-display">Skill Progression</h1>
+        <h1 className="text-xl font-bold tracking-tight text-text">Skill Progression</h1>
         <div className="w-10"></div> {/* Spacer */}
       </nav>
 
-      <main className="px-6 space-y-8 mt-6">
-        {/* Timeframe Selector */}
-        <div className="flex p-1 bg-surface border border-border rounded-xl">
-          <button 
-             onClick={() => setTimeframe('30')}
-             className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-colors ${timeframe === '30' ? 'bg-primary text-white shadow-sm' : 'text-textMuted hover:text-text'}`}>
-             30 Days
-          </button>
-          <button 
-             onClick={() => setTimeframe('90')}
-             className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-colors ${timeframe === '90' ? 'bg-primary text-white shadow-sm' : 'text-textMuted hover:text-text'}`}>
-             90 Days
-          </button>
-          <button 
-             onClick={() => setTimeframe('ALL')}
-             className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-colors ${timeframe === 'ALL' ? 'bg-primary text-white shadow-sm' : 'text-textMuted hover:text-text'}`}>
-             All Time
-          </button>
+      {isGuest ? (
+        <div className="flex-1 flex flex-col items-center justify-center p-8 mt-24">
+          <GuestGate featureName="Your skill progression tracking starts when you create an account">
+            <div className="h-64 w-full" />
+          </GuestGate>
         </div>
+      ) : (
+        <main className="px-6 space-y-8 mt-6">
+          {/* Timeframe Selector */}
+          <div className="flex p-1 bg-surface border border-border rounded-xl">
+            <button 
+               onClick={() => setTimeframe('30')}
+               className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-colors ${timeframe === '30' ? 'bg-primary text-white shadow-sm' : 'text-textMuted hover:text-text'}`}>
+               30 Days
+            </button>
+            <button 
+               onClick={() => setTimeframe('90')}
+               className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-colors ${timeframe === '90' ? 'bg-primary text-white shadow-sm' : 'text-textMuted hover:text-text'}`}>
+               90 Days
+            </button>
+            <button 
+               onClick={() => setTimeframe('ALL')}
+               className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-colors ${timeframe === 'ALL' ? 'bg-primary text-white shadow-sm' : 'text-textMuted hover:text-text'}`}>
+               All Time
+            </button>
+          </div>
 
-        {/* Stats Grid */}
-        <section className="grid grid-cols-2 gap-4">
-          <div className="bg-surface border border-border p-4 rounded-xl shadow-sm">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-textMuted block mb-1">Sessions</span>
-            <span className="text-2xl font-black text-text">{stats.total}</span>
-          </div>
-          <div className="bg-surface border border-border p-4 rounded-xl shadow-sm">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-textMuted block mb-1">Top Speed</span>
-            <span className="text-2xl font-black text-text">{stats.topSpeed}<span className="text-xs font-medium text-textMuted ml-1">km/h</span></span>
-          </div>
-          <div className="bg-surface border border-border p-4 rounded-xl shadow-sm">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-textMuted block mb-1">Best Score</span>
-            <span className="text-2xl font-black text-primary">{stats.bestScore > 0 ? `${stats.bestScore}/5` : '--'}</span>
-          </div>
-          <div className="bg-surface border border-border p-4 rounded-xl shadow-sm">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-textMuted block mb-1">Avg Wave</span>
-            <span className="text-2xl font-black text-text">{stats.avgWaveTime}<span className="text-xs font-medium text-textMuted ml-1">sec</span></span>
-          </div>
-        </section>
+          {/* Stats Grid */}
+          <section className="grid grid-cols-2 gap-4">
+            <div className="bg-surface border border-border p-4 rounded-xl shadow-sm">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-textMuted block mb-1">Sessions</span>
+              <span className="text-2xl font-black text-text">{stats.total}</span>
+            </div>
+            <div className="bg-surface border border-border p-4 rounded-xl shadow-sm">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-textMuted block mb-1">Top Speed</span>
+              <span className="text-2xl font-black text-text">{stats.topSpeed}<span className="text-xs font-medium text-textMuted ml-1">km/h</span></span>
+            </div>
+            <div className="bg-surface border border-border p-4 rounded-xl shadow-sm">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-textMuted block mb-1">Best Score</span>
+              <span className="text-2xl font-black text-primary">{stats.bestScore > 0 ? `${stats.bestScore}/5` : '--'}</span>
+            </div>
+            <div className="bg-surface border border-border p-4 rounded-xl shadow-sm">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-textMuted block mb-1">Avg Wave</span>
+              <span className="text-2xl font-black text-text">{stats.avgWaveTime}<span className="text-xs font-medium text-textMuted ml-1">sec</span></span>
+            </div>
+          </section>
 
-        {/* Performance Chart */}
-        <GuestGate featureName="Performance Trends">
-            <section className="space-y-4">
+          {/* Performance Chart */}
+          <section className="space-y-4">
             <h2 className="text-sm font-bold text-text uppercase tracking-widest flex items-center gap-2">
                 <span className="material-icons-round text-primary text-sm">trending_up</span> Trajectory
             </h2>
             <div className="bg-surface border border-border p-4 rounded-2xl shadow-sm mt-4">
-                {chartData.length > 1 ? (
+                {skillOverTime.length > 1 ? (
                    <div className="h-48 w-full">
                        <ResponsiveContainer width="100%" height="100%">
-                         <LineChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                         <LineChart data={skillOverTime} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border)" opacity={0.5} />
-                           <XAxis dataKey="date" stroke="var(--color-text-muted)" fontSize={10} tickLine={false} axisLine={false} />
-                           <YAxis stroke="var(--color-text-muted)" fontSize={10} tickLine={false} axisLine={false} />
+                           <XAxis dataKey="date" tick={{ fontSize: 10, fill: "#94a3b8" }} tickLine={false} axisLine={false} />
+                           <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: "#94a3b8" }} tickLine={false} axisLine={false} />
                            <Tooltip 
                               contentStyle={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)', borderRadius: '8px' }}
                               itemStyle={{ color: 'var(--color-text)', fontSize: '12px', fontWeight: 'bold' }}
                            />
                            <Line 
                               type="monotone" 
-                              dataKey="rating" 
-                              name="Session Score"
-                              stroke="var(--color-primary)" 
-                              strokeWidth={3} 
-                              dot={{ r: 4, fill: 'var(--color-primary)', strokeWidth: 2, stroke: 'var(--color-background)' }}
-                              activeDot={{ r: 6 }} 
-                           />
-                           <Line 
-                              type="monotone" 
-                              dataKey="waves" 
-                              name="Wave Count"
-                              stroke="var(--color-accent2)" 
+                              dataKey="score"
+                              name="Skill Score"
+                              stroke="#06b6d4" 
                               strokeWidth={2} 
-                              strokeDasharray="4 4"
                               dot={false}
                            />
                          </LineChart>
@@ -184,12 +204,10 @@ export const SkillProgressionScreen: React.FC<SkillProgressionScreenProps> = ({ 
                    </div>
                 )}
             </div>
-            </section>
-        </GuestGate>
+          </section>
 
-        {/* Coach's Tip Section */}
-        <GuestGate featureName="AI Coach Analysis">
-            <section className="pb-8">
+          {/* Coach's Tip Section */}
+          <section className="pb-8">
             <div className="bg-primary/5 border border-primary/20 p-6 rounded-2xl relative shadow-inner">
                 <div className="flex items-center gap-3 mb-4">
                     <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-white shadow-lg shadow-primary/30">
@@ -218,9 +236,9 @@ export const SkillProgressionScreen: React.FC<SkillProgressionScreenProps> = ({ 
                     )}
                 </div>
             </div>
-            </section>
-        </GuestGate>
-      </main>
+          </section>
+        </main>
+      )}
     </div>
   );
 };

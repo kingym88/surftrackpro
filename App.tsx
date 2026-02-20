@@ -35,19 +35,8 @@ const HIDE_NAV_SCREENS: Screen[] = [
 
 // ─── Auth Loading Splash ───────────────────────────────────────────────────────
 const AuthLoadingSplash: React.FC = () => (
-  <div className="flex flex-col items-center justify-center min-h-screen bg-slate-900 gap-6">
-    <div className="bg-cyan-500 p-5 rounded-3xl shadow-xl shadow-cyan-500/30 animate-pulse">
-      <span className="material-icons-round text-slate-900 text-5xl">waves</span>
-    </div>
-    <div className="text-center">
-      <h1 className="text-2xl font-bold text-white mb-1">SurfTrack Pro</h1>
-      <p className="text-slate-400 text-sm">Loading your surf data…</p>
-    </div>
-    <div className="flex gap-2 mt-2">
-      <div className="w-2 h-2 rounded-full bg-cyan-500 animate-bounce" style={{ animationDelay: '0ms' }} />
-      <div className="w-2 h-2 rounded-full bg-cyan-500 animate-bounce" style={{ animationDelay: '150ms' }} />
-      <div className="w-2 h-2 rounded-full bg-cyan-500 animate-bounce" style={{ animationDelay: '300ms' }} />
-    </div>
+  <div className="bg-slate-900 h-screen w-screen flex items-center justify-center">
+    <span className="material-icons-round text-5xl text-cyan-500 animate-pulse">waves</span>
   </div>
 );
 
@@ -148,31 +137,31 @@ const AppInner: React.FC = () => {
   const showNav = !HIDE_NAV_SCREENS.includes(currentScreen);
 
   return (
-    <ThemeProvider>
-      <AppProvider isGuest={isGuest}>
+    <AppProvider isGuest={isGuest}>
+      <ToastProvider>
         <div className="max-w-md mx-auto min-h-screen relative overflow-hidden">
           {renderScreen()}
 
-        {showNav && isGuest && (
-          <GuestBanner onNavigate={navigate} />
-        )}
+          {showNav && isGuest && (
+            <GuestBanner onNavigate={navigate} />
+          )}
 
-        {showNav && (
-          <Navigation currentScreen={currentScreen} onNavigate={navigate} />
-        )}
-      </div>
+          {showNav && (
+            <Navigation currentScreen={currentScreen} onNavigate={navigate} />
+          )}
+        </div>
+      </ToastProvider>
     </AppProvider>
-    </ThemeProvider>
   );
 };
 
 // ─── Root App ─────────────────────────────────────────────────────────────────
 export default function App() {
   return (
-    <AuthProvider>
-       <ToastProvider>
-         <AppInner />
-       </ToastProvider>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <AppInner />
+      </AuthProvider>
+    </ThemeProvider>
   );
 }

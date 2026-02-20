@@ -1,6 +1,7 @@
 import React from 'react';
 import type { ForecastSnapshot, SwellQualityScore } from '@/types';
 import { computeSwellQuality } from '@/src/services/swellQuality';
+import { GuestGate } from './GuestGate';
 
 // Default break profile for Porto/Peniche area
 const DEFAULT_BREAK_PROFILE = {
@@ -96,23 +97,24 @@ export const ForecastStrip: React.FC<ForecastStripProps> = ({
 
           if (isLocked) {
             return (
-              <div
-                key={day.date}
-                className="snap-start flex-shrink-0 w-20 rounded-xl bg-surface/50 border border-border p-3 flex flex-col items-center gap-2 relative overflow-hidden"
-              >
-                <div className="blur-sm opacity-40 flex flex-col items-center gap-2 w-full">
-                  <p className="text-xs font-medium text-textMuted">{day.label}</p>
-                  <div className={`text-[10px] font-bold px-2 py-0.5 rounded border ${getLabelColour(day.score.label)}`}>
-                    {day.score.label}
+              <GuestGate key={day.date} featureName="Unlock full 7-day forecast" clickOnly>
+                <div
+                  className="snap-start flex-shrink-0 w-20 rounded-xl bg-surface/50 border border-border p-3 flex flex-col items-center gap-2 relative overflow-hidden cursor-pointer"
+                >
+                  <div className="blur-sm opacity-40 flex flex-col items-center gap-2 w-full">
+                    <p className="text-xs font-medium text-textMuted">{day.label}</p>
+                    <div className={`text-[10px] font-bold px-2 py-0.5 rounded border ${getLabelColour(day.score.label)}`}>
+                      {day.score.label}
+                    </div>
+                    <p className="text-xs font-bold text-text">
+                      {day.snapshots[0]?.waveHeight?.toFixed(1)}m
+                    </p>
                   </div>
-                  <p className="text-xs font-bold text-text">
-                    {day.snapshots[0]?.waveHeight?.toFixed(1)}m
-                  </p>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="material-icons-round text-slate-500 text-base">lock</span>
+                  </div>
                 </div>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="material-icons-round text-slate-500 text-base">lock</span>
-                </div>
-              </div>
+              </GuestGate>
             );
           }
 

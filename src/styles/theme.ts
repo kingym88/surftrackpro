@@ -1,5 +1,18 @@
 export type Theme = 'light' | 'dark';
 
+export const themeClasses = {
+  background: "bg-slate-900 dark:bg-slate-900 bg-slate-50",
+  surface: "bg-slate-800 dark:bg-slate-800 bg-white",
+  cardBg: "bg-slate-800/80 dark:bg-slate-800/80 bg-slate-100",
+  textPrimary: "text-white dark:text-white text-slate-900",
+  textMuted: "text-slate-400 dark:text-slate-400 text-slate-500",
+  border: "border-slate-700 dark:border-slate-700 border-slate-200",
+  accent: "bg-cyan-500 text-white",
+  success: "text-emerald-400",
+  warning: "text-amber-400",
+  error: "text-red-400",
+} as const;
+
 export const themeTokens = {
   colors: {
     // Shared
