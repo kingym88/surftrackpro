@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "deploy": "npm run build:web && firebase deploy --only hosting",
     "deploy:rules": "firebase deploy --only firestore:rules",
-    "precompute": "npx ts-node --esm scripts/precomputeForecasts.ts",
+    "precompute": "npx tsx scripts/precomputeForecasts.ts",
     "build:android": "npm run build:web && npx cap sync android && npx cap open android",
     "build:ios": "npm run build:web && npx cap sync ios && npx cap open ios"
   },
@@ -37,7 +37,7 @@
     "@capacitor/ios": "^7.2.0",
     "@types/node": "^22.14.0",
     "@vitejs/plugin-react": "^5.0.0",
-    "ts-node": "^10.9.2",
+    "tsx": "^4.19.2",
     "typescript": "~5.8.2",
     "vite": "^6.2.0",
     "vite-plugin-pwa": "^0.21.1"
