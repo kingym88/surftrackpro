@@ -171,33 +171,46 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate, onSele
           </div>
         </div>
 
-        {/* Board Usage */}
-        {stats.boardUsage.length > 0 && (
-            <div onClick={() => onNavigate(Screen.QUIVER)} className="mt-4 bg-surface p-5 rounded-2xl border border-border shadow-sm cursor-pointer hover:border-primary/50 transition-colors">
-            <div className="flex justify-between items-center mb-4">
-                <p className="text-[10px] font-bold text-primary uppercase tracking-widest">Quiver Usage</p>
-                <span className="material-icons-round text-slate-400 text-sm">chevron_right</span>
+        {/* Board Usage or Empty Quiver Link */}
+        <div onClick={() => onNavigate(Screen.QUIVER)} className="mt-4 bg-surface p-5 rounded-2xl border border-border shadow-sm cursor-pointer hover:border-primary/50 transition-colors group">
+            <div className="flex justify-between items-center">
+                <p className="text-[10px] font-bold text-primary uppercase tracking-widest">My Quiver</p>
+                <div className="w-8 h-8 rounded-full bg-background border border-border flex items-center justify-center group-hover:bg-primary/10 transition-colors">
+                    <span className="material-icons-round text-textMuted text-sm group-hover:text-primary transition-colors">chevron_right</span>
+                </div>
             </div>
-            <div className="space-y-4">
-                {stats.boardUsage.map((usage, idx) => (
-                    <div key={usage.id} className="flex items-center">
-                        <div className="w-8 mr-3 opacity-60 flex items-center justify-center">
-                            <span className="material-icons-round text-textMuted text-lg">{idx === 0 ? 'surfing' : 'waves'}</span>
-                        </div>
-                        <div className="flex-1">
-                            <div className="flex justify-between text-xs mb-1 font-bold">
-                                <span className="text-text truncate w-32">{usage.board?.brand || 'Board'} {usage.board?.model}</span>
-                                <span className={idx === 0 ? 'text-primary' : 'text-textMuted'}>{usage.percentage}%</span>
+            
+            {stats.boardUsage.length > 0 ? (
+                <div className="space-y-4 mt-4">
+                    {stats.boardUsage.map((usage, idx) => (
+                        <div key={usage.id} className="flex items-center">
+                            <div className="w-8 mr-3 opacity-60 flex items-center justify-center">
+                                <span className="material-icons-round text-textMuted text-lg">{idx === 0 ? 'surfing' : 'waves'}</span>
                             </div>
-                            <div className="h-1.5 w-full bg-background border border-border rounded-full overflow-hidden">
-                                <div className={`h-full rounded-full ${idx === 0 ? 'bg-primary' : 'bg-textMuted/40'}`} style={{ width: `${usage.percentage}%` }}></div>
+                            <div className="flex-1">
+                                <div className="flex justify-between text-xs mb-1 font-bold">
+                                    <span className="text-text truncate w-32">{usage.board?.brand || 'Board'} {usage.board?.model}</span>
+                                    <span className={idx === 0 ? 'text-primary' : 'text-textMuted'}>{usage.percentage}%</span>
+                                </div>
+                                <div className="h-1.5 w-full bg-background border border-border rounded-full overflow-hidden">
+                                    <div className={`h-full rounded-full ${idx === 0 ? 'bg-primary' : 'bg-textMuted/40'}`} style={{ width: `${usage.percentage}%` }}></div>
+                                </div>
                             </div>
                         </div>
+                    ))}
+                </div>
+            ) : (
+                <div className="mt-4 flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-background border border-border flex items-center justify-center shadow-inner">
+                        <span className="material-icons-round text-primary/40 text-xl">surfing</span>
                     </div>
-                ))}
-            </div>
-            </div>
-        )}
+                    <div>
+                        <p className="text-sm font-bold text-text">Manage your boards</p>
+                        <p className="text-[10px] text-textMuted uppercase tracking-wider font-bold">Tap to add your first board</p>
+                    </div>
+                </div>
+            )}
+        </div>
       </section>
 
       {/* Skill Progression Visualizer */}
