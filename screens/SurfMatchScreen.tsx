@@ -1,167 +1,322 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '@/src/context/AuthContext';
+import { useApp } from '@/src/context/AppContext';
+import { useUnits } from '@/src/hooks/useUnits';
+import { getSpots, getUserProfile, addSession } from '@/src/services/firestore';
+import { fetchOpenMeteoForecast } from '@/src/services/openMeteo';
+import { computeSwellQuality } from '@/src/services/swellQuality';
+import { getGeminiInsight } from '@/src/services/geminiInsight';
+import type { SurfSpot, ForecastSnapshot, SwellQualityScore } from '@/types';
 
-interface SurfMatchScreenProps {
-    //
+interface MatchResult {
+  spot: SurfSpot;
+  forecast: ForecastSnapshot;
+  score: SwellQualityScore;
 }
 
-export const SurfMatchScreen: React.FC<SurfMatchScreenProps> = () => {
-  return (
-    <div className="pb-24">
-        {/* Header */}
-        <header className="px-6 py-4 sticky top-0 z-30 bg-background-dark/80 backdrop-blur-md">
-            <div className="flex justify-between items-end">
-                <div>
-                    <p className="text-xs font-bold uppercase tracking-widest text-primary/80">Tailored Forecast</p>
-                    <h1 className="text-3xl font-bold tracking-tight text-text">Surf Match</h1>
-                </div>
-                <button className="w-10 h-10 flex items-center justify-center rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors">
-                    <span className="material-icons-round">tune</span>
-                </button>
-            </div>
-        </header>
+const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-        <main className="px-6 pb-32">
-            {/* Week Selector */}
-            <div className="flex gap-4 overflow-x-auto py-6 no-scrollbar">
-                <div className="flex flex-col items-center min-w-[56px] p-3 rounded-2xl bg-primary text-text shadow-lg shadow-primary/30 transform scale-105">
-                    <span className="text-xs font-medium opacity-80">Sat</span>
-                    <span className="text-xl font-bold">14</span>
-                    <div className="w-1 h-1 bg-white rounded-full mt-1"></div>
-                </div>
-                {['Sun 15', 'Mon 16', 'Tue 17', 'Wed 18'].map((d) => {
-                    const [day, num] = d.split(' ');
-                    return (
-                        <div key={d} className="flex flex-col items-center min-w-[56px] p-3 rounded-2xl bg-primary/10 border border-primary/10 cursor-pointer hover:bg-primary/20 transition-colors">
-                            <span className="text-xs font-medium opacity-60 text-textMuted">{day}</span>
-                            <span className="text-xl font-bold text-text">{num}</span>
-                        </div>
-                    );
-                })}
-            </div>
+export const SurfMatchScreen: React.FC = () => {
+    const { user } = useAuth();
+    const { spots } = useApp();
+    const units = useUnits();
 
-            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-text">
-                <span className="material-icons-round text-primary text-sm">stars</span>
-                Today's Best Matches
-            </h2>
+    const [selectedDayIndex, setSelectedDayIndex] = useState(0);
+    const [matches, setMatches] = useState<MatchResult[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [personalInsight, setPersonalInsight] = useState<string | null>(null);
 
-            {/* Match Cards List */}
-            <div className="space-y-6">
-                {/* Card 1: 95% Match */}
-                <div className="rounded-xl p-5 bg-background/50 border border-border shadow-sm relative overflow-hidden group hover:border-primary/30 transition-colors">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -mr-16 -mt-16 blur-2xl group-hover:bg-primary/10 transition-colors"></div>
+    // Initialise 7 days starting from today
+    const [days] = useState<Date[]>(() => {
+        const today = new Date();
+        return Array.from({ length: 7 }, (_, i) => {
+            const d = new Date(today.getTime());
+            d.setDate(today.getDate() + i);
+            return d;
+        });
+    });
+
+    const fetchMatches = async () => {
+        if (!user) {
+            setError('Please sign in to view tailored Surf Matches.');
+            return;
+        }
+
+        setIsLoading(true);
+        setError(null);
+        setMatches([]);
+        setPersonalInsight(null);
+
+        try {
+            const profile = await getUserProfile(user.uid);
+            const userPrefs = profile ? { min: profile.preferredWaveHeightMin, max: profile.preferredWaveHeightMax } : undefined;
+
+            let fetchedSpots = await getSpots();
+            if (!fetchedSpots || fetchedSpots.length === 0) {
+                fetchedSpots = spots;
+            }
+
+            const targetSpots = fetchedSpots.slice(0, 5); 
+            if (targetSpots.length === 0) {
+                throw new Error('No spots available to verify conditions against.');
+            }
+
+            const activeDatePrefix = days[selectedDayIndex].toISOString().slice(0, 10);
+            const localSpotRanks: MatchResult[] = [];
+
+            for (const s of targetSpots) {
+                try {
+                    const localForecastLogs = await fetchOpenMeteoForecast(s.coordinates.lat, s.coordinates.lng);
+                    const matchingDaySlices = localForecastLogs.filter(f => f.forecastHour.startsWith(activeDatePrefix));
                     
-                    <div className="flex gap-4 items-start mb-6 relative z-10">
-                        {/* Match Percentage Box (Left Aligned) */}
-                        <div className="w-16 h-16 rounded-2xl bg-primary flex flex-col items-center justify-center text-text shadow-lg shadow-primary/20 flex-shrink-0">
-                             <span className="text-xl font-bold">95%</span>
-                             <span className="text-[10px] uppercase font-bold text-text/80">Match</span>
-                        </div>
-                        
-                        <div>
-                            <h3 className="text-xl font-bold mb-1 text-text">Saturday Morning</h3>
-                            <p className="text-sm text-textMuted flex items-center gap-1">
-                                <span className="material-icons-round text-xs">location_on</span>
-                                Malibu First Point
-                            </p>
-                            <p className="text-xs font-medium text-primary mt-1">7:00 AM — 10:30 AM</p>
-                        </div>
-                    </div>
+                    let optimizedWindow: MatchResult | null = null;
+                    
+                    for (const snap of matchingDaySlices) {
+                        const hr = new Date(snap.forecastHour).getUTCHours();
+                        if (hr < 6 || hr > 19) continue; // Daylight filter logic constraints
 
-                    <div className="grid grid-cols-3 gap-2 mb-6 relative z-10">
-                        <div className="bg-primary/10 p-2 rounded-lg text-center">
-                            <span className="block text-[10px] uppercase tracking-tighter text-textMuted">Swell</span>
-                            <span className="text-sm font-bold text-text">4.2ft</span>
-                        </div>
-                        <div className="bg-primary/10 p-2 rounded-lg text-center">
-                            <span className="block text-[10px] uppercase tracking-tighter text-textMuted">Period</span>
-                            <span className="text-sm font-bold text-text">12s</span>
-                        </div>
-                        <div className="bg-primary/10 p-2 rounded-lg text-center">
-                            <span className="block text-[10px] uppercase tracking-tighter text-textMuted">Wind</span>
-                            <span className="text-sm font-bold text-green-500">Offshore</span>
-                        </div>
-                    </div>
-                    <div className="space-y-2 mb-6 relative z-10">
-                        <p className="text-xs font-bold text-textMuted uppercase tracking-widest">Why it's a match</p>
-                        <ul className="space-y-2">
-                            <li className="flex items-center gap-2 text-sm text-textMuted">
-                                <span className="material-icons-round text-primary text-xs">check_circle</span>
-                                <span>Swell height aligns with your "Sweet Spot"</span>
-                            </li>
-                            <li className="flex items-center gap-2 text-sm text-textMuted">
-                                <span className="material-icons-round text-primary text-xs">check_circle</span>
-                                <span>Glassy offshore conditions predicted</span>
-                            </li>
-                            <li className="flex items-center gap-2 text-sm text-textMuted">
-                                <span className="material-icons-round text-primary text-xs">check_circle</span>
-                                <span>Tide is pushing, your favorite state</span>
-                            </li>
-                        </ul>
-                    </div>
-                    <button className="relative z-10 w-full py-3 bg-primary hover:bg-primary/90 text-text font-bold rounded-lg transition-all flex items-center justify-center gap-2">
-                        <span className="material-icons-round text-sm">calendar_today</span>
-                        Save to My Sessions
-                    </button>
-                </div>
+                        const computedScore = computeSwellQuality(snap, s.breakProfile);
+                        if (!optimizedWindow || computedScore.score > optimizedWindow.score.score) {
+                            optimizedWindow = { spot: s, forecast: snap, score: computedScore };
+                        }
+                    }
 
-                {/* Card 2: 82% Match */}
-                <div className="rounded-xl p-5 bg-background/50 border border-border shadow-sm relative overflow-hidden group hover:border-primary/30 transition-colors">
-                    <div className="flex gap-4 items-start mb-6">
-                        {/* Match Percentage Box (Left Aligned) */}
-                        <div className="w-16 h-16 rounded-2xl bg-surface border border-slate-700 flex flex-col items-center justify-center text-text shadow-lg flex-shrink-0">
-                             <span className="text-xl font-bold">82%</span>
-                             <span className="text-[10px] uppercase font-bold text-textMuted">Match</span>
-                        </div>
-                        
-                        <div>
-                            <h3 className="text-xl font-bold mb-1 text-text">Sunday Sunset</h3>
-                            <p className="text-sm text-textMuted flex items-center gap-1">
-                                <span className="material-icons-round text-xs">location_on</span>
-                                Zuma Beach
-                            </p>
-                            <p className="text-xs font-medium text-primary mt-1">4:30 PM — 7:00 PM</p>
-                        </div>
-                    </div>
+                    if (optimizedWindow) {
+                        localSpotRanks.push(optimizedWindow);
+                    }
+                } catch (e) {
+                    console.warn(`Forecast lookup bypass. Rate limit or region gap on spot: ${s.id}`, e);
+                }
+            }
 
-                    <div className="grid grid-cols-3 gap-2 mb-6">
-                        <div className="bg-primary/10 p-2 rounded-lg text-center">
-                            <span className="block text-[10px] uppercase tracking-tighter text-textMuted">Swell</span>
-                            <span className="text-sm font-bold text-text">3.1ft</span>
-                        </div>
-                        <div className="bg-primary/10 p-2 rounded-lg text-center">
-                            <span className="block text-[10px] uppercase tracking-tighter text-textMuted">Period</span>
-                            <span className="text-sm font-bold text-text">10s</span>
-                        </div>
-                        <div className="bg-primary/10 p-2 rounded-lg text-center">
-                            <span className="block text-[10px] uppercase tracking-tighter text-textMuted">Wind</span>
-                            <span className="text-sm font-bold text-amber-500">Cross</span>
-                        </div>
-                    </div>
-                    <button className="w-full py-3 border-2 border-primary/20 hover:border-primary/40 text-primary font-bold rounded-lg transition-all flex items-center justify-center gap-2">
-                        <span className="material-icons-round text-sm">bookmark_border</span>
-                        Add to Wishlist
-                    </button>
-                </div>
+            if (localSpotRanks.length === 0) {
+                throw new Error('No favorable condition windows matched your criteria for this date.');
+            }
 
-                {/* Suggestion Card */}
-                <div className="bg-gradient-to-br from-primary to-blue-700 p-6 rounded-2xl text-text shadow-xl relative overflow-hidden cursor-pointer hover:shadow-2xl transition-shadow">
-                    <div className="relative z-10">
-                        <div className="flex items-center gap-2 mb-2">
-                            <span className="material-icons-round text-sm">psychology</span>
-                            <span className="text-[10px] uppercase font-bold tracking-[0.2em]">Personal Insight</span>
-                        </div>
-                        <h4 className="text-lg font-bold mb-2">Feeling brave?</h4>
-                        <p className="text-sm opacity-90 leading-relaxed mb-4">
-                            We noticed you performed best at El Porto when it's 5ft+. A massive swell hits Tuesday. Should we alert you if it hits 90%?
-                        </p>
-                        <button className="bg-white text-primary px-4 py-2 rounded-full text-xs font-bold hover:bg-white/90 transition-colors">Notify Me</button>
-                    </div>
-                    <div className="absolute inset-0 opacity-20 pointer-events-none">
-                        <img className="w-full h-full object-cover mix-blend-overlay" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCamFjkk5DUgoJoqZpPSnVI_MWzfqcaiex0k6QsYKZKKsLEj80YhgJ6gbl7iHKESm2xSyV5JdzceNJCyiVT5DiN8iqiT8J-3ehPLwLqeEiU_tzPBQpDBNNjr1EKd_cUdfwNO8i-1frLOqVVHZ7Bfz7JA0pcROR7EeyVsL3IT-uUJ8snIWeQO8f_WCh7K2gBPPXUyt1WuofbOrw0Tde4vnmuv3Vt-wJdhBVc3bValyWStPyeJ1bdEbPBVINjMZYttCGSMrK5OBo48cZO" alt="Abstract Pattern" />
+            localSpotRanks.sort((a,b) => b.score.score - a.score.score);
+            setMatches(localSpotRanks);
+
+            try {
+                const highestMatchTier = localSpotRanks[0];
+                const genAI = await getGeminiInsight([highestMatchTier.forecast], highestMatchTier.spot.breakProfile, [], userPrefs);
+                setPersonalInsight(genAI.summary);
+            } catch (aiErr) {
+                console.warn('AI Parsing skipped for offline.', aiErr);
+                setPersonalInsight('AI coach analysis is temporarily delayed today.');
+            }
+
+        } catch (fatalObj: any) {
+            console.error('Core match resolution failed:', fatalObj);
+            setError(fatalObj.message || 'We could not fetch your matches right now.');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchMatches();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedDayIndex, user]);
+
+    // -- Handlers -- 
+    const handleBookmarkCondition = async (matchPayload: MatchResult, bookmarkFormat: 'history' | 'wishlist') => {
+        if (!user) return;
+        try {
+            await addSession(user.uid, {
+                spotName: matchPayload.spot.name,
+                spotId: matchPayload.spot.id,
+                date: matchPayload.forecast.forecastHour,
+                rating: Math.max(1, Math.floor(matchPayload.score.score / 20)),
+                height: matchPayload.forecast.waveHeight.toString(),
+                image: matchPayload.spot.image || '',
+                timestamp: Date.now(),
+                notes: bookmarkFormat === 'wishlist' ? 'Future Wishlist Condition' : '',
+                conditionsSnapshot: {
+                    waveHeight: matchPayload.forecast.waveHeight,
+                    wavePeriod: matchPayload.forecast.wavePeriod,
+                    windSpeed: matchPayload.forecast.windSpeed,
+                    windDirection: matchPayload.forecast.windDirection,
+                    tide: 0,
+                }
+            });
+            alert('Condition archived to your progression timeline.');
+        } catch(e) {
+            console.error('Failed to snapshot timeline action:', e);
+        }
+    };
+
+    // -- Component UI Render Logic --
+    const getCalendarRef = (d: Date, idx: number) => {
+        if (idx === 0) return "Today's";
+        return d.toLocaleDateString('en-US', { weekday: 'short' }) + ' ' + d.getDate();
+    };
+
+    const getWindowLabel = (iso: string) => {
+        const pivot = new Date(iso);
+        const pivotStr = pivot.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const close = new Date(pivot.getTime() + 3 * 60 * 60 * 1000);
+        return `${pivotStr} — ${close.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    };
+
+    const getWindColor = (speed: number) => {
+        return speed < 15 ? 'text-green-500' : speed < 25 ? 'text-amber-500' : 'text-red-500';
+    };
+
+    return (
+        <div className="pb-24">
+            <header className="px-6 py-4 sticky top-0 z-30 bg-background/80 backdrop-blur-md">
+                <div className="flex justify-between items-end">
+                    <div>
+                        <p className="text-xs font-bold uppercase tracking-widest text-primary/80">Tailored Forecast</p>
+                        <h1 className="text-3xl font-bold tracking-tight text-text">Surf Match</h1>
                     </div>
                 </div>
-            </div>
-        </main>
-    </div>
-  );
+            </header>
+
+            <main className="px-6 pb-32">
+                <div className="flex gap-4 overflow-x-auto py-6" style={{ scrollbarWidth: 'none' }}>
+                    {days.map((d, index) => {
+                        const isSelected = selectedDayIndex === index;
+                        return (
+                            <button 
+                                key={index} 
+                                onClick={() => setSelectedDayIndex(index)}
+                                className={`flex flex-col flex-shrink-0 items-center min-w-[56px] p-3 rounded-2xl cursor-pointer transition-colors ${isSelected ? 'bg-primary text-white shadow-lg shadow-primary/30 transform scale-105' : 'bg-primary/10 border border-border hover:bg-primary/20 text-textMuted'}`}
+                            >
+                                <span className={`text-xs font-medium ${isSelected ? 'opacity-90 text-white' : ''}`}>
+                                    {dayNames[d.getDay()]}
+                                </span>
+                                <span className={`text-xl font-bold ${isSelected ? 'text-white' : 'text-text'}`}>
+                                    {d.getDate()}
+                                </span>
+                            </button>
+                        );
+                    })}
+                </div>
+
+                <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-text">
+                    <span className="material-icons-round text-primary text-sm">stars</span>
+                    {getCalendarRef(days[selectedDayIndex], selectedDayIndex)} Best Matches
+                </h2>
+
+                {isLoading && (
+                    <div className="flex justify-center items-center py-12">
+                        <span className="material-icons-round text-4xl text-primary animate-spin">sync</span>
+                    </div>
+                )}
+
+                {error && !isLoading && (
+                    <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-xl text-center">
+                        <p className="text-red-400 text-sm mb-3">{error}</p>
+                        <button onClick={fetchMatches} className="px-4 py-2 bg-red-500/20 text-red-500 rounded-lg text-xs font-bold uppercase border border-red-500/30 hover:bg-red-500/30 transition-colors">Retry Matching</button>
+                    </div>
+                )}
+
+                {!isLoading && !error && (
+                    <div className="space-y-6">
+                        {matches.map((match, idx) => {
+                            const isTopMatch = idx === 0;
+                            const dtPoint = new Date(match.forecast.forecastHour);
+                            const phase = dtPoint.getUTCHours() < 12 ? 'Morning' : 'Afternoon';
+                            const matchTitle = `${dayNames[dtPoint.getDay()]} ${phase}`;
+
+                            return (
+                                <div key={match.spot.id} className="rounded-xl p-5 bg-surface border border-border shadow-sm relative overflow-hidden group hover:border-primary/30 transition-colors">
+                                    {isTopMatch && <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-full -mr-16 -mt-16 blur-2xl group-hover:bg-primary/20 transition-colors"></div>}
+                                    
+                                    <div className="flex gap-4 items-start mb-6 relative z-10">
+                                        <div className={`w-16 h-16 flex-shrink-0 rounded-2xl flex flex-col items-center justify-center text-text ${isTopMatch ? 'bg-primary shadow-lg shadow-primary/30 text-white' : 'bg-background border border-border shadow-md'}`}>
+                                             <span className="text-xl font-bold">{match.score.score}%</span>
+                                             <span className={`text-[10px] uppercase font-bold ${isTopMatch ? 'text-white/80' : 'text-textMuted'}`}>Match</span>
+                                        </div>
+                                        
+                                        <div>
+                                            <h3 className="text-xl font-bold mb-1 text-text">{matchTitle}</h3>
+                                            <p className="text-sm text-textMuted flex items-center gap-1">
+                                                <span className="material-icons-round text-xs">location_on</span>
+                                                {match.spot.name}
+                                            </p>
+                                            <p className="text-xs font-medium text-primary mt-1">{getWindowLabel(match.forecast.forecastHour)}</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-3 gap-2 mb-6 relative z-10">
+                                        <div className="bg-background pt-2 pb-2 rounded-lg text-center border border-border">
+                                            <span className="block text-[10px] uppercase tracking-tighter text-textMuted">Swell</span>
+                                            <span className="text-sm font-bold text-text">{units.height(match.forecast.waveHeight)}</span>
+                                        </div>
+                                        <div className="bg-background pt-2 pb-2 rounded-lg text-center border border-border">
+                                            <span className="block text-[10px] uppercase tracking-tighter text-textMuted">Period</span>
+                                            <span className="text-sm font-bold text-text">{match.forecast.wavePeriod.toFixed(0)}s</span>
+                                        </div>
+                                        <div className="bg-background pt-2 pb-2 rounded-lg text-center border border-border">
+                                            <span className="block text-[10px] uppercase tracking-tighter text-textMuted">Wind</span>
+                                            <span className={`text-sm font-bold ${getWindColor(match.forecast.windSpeed)}`}>
+                                                {units.speed(match.forecast.windSpeed)}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-2 mb-6 relative z-10">
+                                        <p className="text-xs font-bold text-textMuted uppercase tracking-widest">Why it's a match</p>
+                                        <ul className="space-y-2">
+                                            {match.score.reasons.map((r, i) => (
+                                                <li key={i} className="flex items-center gap-2 text-sm text-textMuted">
+                                                    <span className="material-icons-round text-primary text-xs">check_circle</span>
+                                                    <span>{r}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                    
+                                    {selectedDayIndex === 0 ? (
+                                        <button 
+                                            onClick={() => handleBookmarkCondition(match, 'history')} 
+                                            className="relative z-10 w-full py-3 bg-primary hover:bg-primary/90 text-white font-bold rounded-lg transition-all flex items-center justify-center gap-2"
+                                        >
+                                            <span className="material-icons-round text-sm">calendar_today</span>
+                                            Save to My Sessions
+                                        </button>
+                                    ) : (
+                                        <button 
+                                            onClick={() => handleBookmarkCondition(match, 'wishlist')} 
+                                            className="relative z-10 w-full py-3 bg-background border border-border hover:border-primary/40 text-primary font-bold rounded-lg transition-all flex items-center justify-center gap-2"
+                                        >
+                                            <span className="material-icons-round text-sm">bookmark_border</span>
+                                            Add to Wishlist
+                                        </button>
+                                    )}
+                                </div>
+                            );
+                        })}
+
+                        {matches.length > 0 && (
+                            <div className="bg-gradient-to-br from-primary to-blue-700 p-6 rounded-2xl text-white shadow-xl relative overflow-hidden mt-6">
+                                <div className="relative z-10">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <span className="material-icons-round text-sm text-white/80">psychology</span>
+                                        <span className="text-[10px] uppercase font-bold tracking-[0.2em] text-white/80">Personal Insight</span>
+                                    </div>
+                                    <h4 className="text-lg font-bold mb-3 text-white">AI Coach</h4>
+                                    
+                                    {personalInsight === null ? (
+                                        <div className="animate-pulse space-y-2 mb-2">
+                                            <div className="h-3 bg-white/30 rounded w-full"></div>
+                                            <div className="h-3 bg-white/30 rounded w-5/6"></div>
+                                            <div className="h-3 bg-white/30 rounded w-4/6"></div>
+                                        </div>
+                                    ) : (
+                                        <p className="text-sm opacity-95 leading-relaxed font-medium">
+                                            {personalInsight}
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+            </main>
+        </div>
+    );
 };
