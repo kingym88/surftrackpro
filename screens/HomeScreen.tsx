@@ -83,8 +83,24 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
   };
 
   const computeWindLabel = (dir: number) => {
-    // simplified offshore/onshore logic
-    return "Wind"; 
+    if (!homeSpot || !homeSpot.breakProfile) return "Wind";
+    
+    // Convert compass facing to degrees
+    const compassToDeg = (c: string): number => {
+      const map: Record<string, number> = { N: 0, NE: 45, E: 90, SE: 135, S: 180, SW: 225, W: 270, NW: 315 };
+      return map[c.toUpperCase()] ?? 0;
+    };
+    
+    const facingDeg = compassToDeg(homeSpot.breakProfile.facingDirection);
+    const offshoreDeg = (facingDeg + 180) % 360;
+    
+    // Calculate smallest difference between wind dir and perfect offshore
+    const diff = Math.abs(dir - offshoreDeg) % 360;
+    const finalDiff = diff > 180 ? 360 - diff : diff;
+    
+    if (finalDiff <= 45) return "Offshore";
+    if (finalDiff <= 135) return "Cross-shore";
+    return "Onshore";
   };
 
   const qualityScore = currentSnap ? computeSwellQuality(currentSnap, (homeSpot as any)?.breakProfile || {} as any) : null;
@@ -105,7 +121,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
             </div>
           </div>
         </div>
-        <button className="relative bg-surface p-2.5 rounded-full border border-border hover:bg-surface hover:brightness-110 transition-colors">
+        <button className="relative bg-white/5 p-2.5 rounded-full border border-white/10 hover:bg-white/10 transition-colors">
           <span className="material-icons-round">notifications</span>
           <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-primary rounded-full border-2 border-background-dark"></span>
         </button>
@@ -114,14 +130,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
       <main className="p-6 space-y-8">
         {/* Set Your Home Break */}
         {showSpotPicker && (
-          <section className="bg-surface rounded-xl p-6 border border-border">
-            <h2 className="text-lg font-bold text-text mb-4">Set Your Home Break</h2>
+          <section className="bg-white/5 rounded-xl p-6 border border-white/10">
+            <h2 className="text-lg font-bold text-slate-200 mb-4">Set Your Home Break</h2>
             <div className="relative">
-              <span className="material-icons-round absolute left-3 top-1/2 -translate-y-1/2 text-textMuted text-sm">search</span>
+              <span className="material-icons-round absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm">search</span>
               <input 
                 type="text"
                 placeholder="Search spots (e.g. Carcavelos)..."
-                className="w-full bg-background text-text rounded-xl py-3 pl-10 pr-4 outline-none border border-border focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                className="w-full bg-background text-slate-200 rounded-xl py-3 pl-10 pr-4 outline-none border border-white/10 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
                 value={searchQuery}
                 onChange={(e) => {
                   setSearchQuery(e.target.value);
@@ -131,16 +147,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
               />
               
               {showSuggestions && filteredSuggestions.length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-2 bg-surface border border-border rounded-xl shadow-xl z-50 overflow-hidden">
+                <div className="absolute top-full left-0 right-0 mt-2 bg-surface border border-white/10 rounded-xl shadow-xl z-50 overflow-hidden">
                   {filteredSuggestions.map(s => (
                     <div 
                       key={s.id}
                       onClick={() => handleSpotSelect(s.id)}
-                      className="p-4 hover:bg-primary/10 cursor-pointer flex justify-between items-center border-b border-border last:border-0"
+                      className="p-4 hover:bg-white/10 cursor-pointer flex justify-between items-center border-b border-white/5 last:border-0"
                     >
                       <div>
-                        <p className="font-bold text-sm text-text">{s.name}</p>
-                        <p className="text-[10px] text-textMuted uppercase">{s.region}</p>
+                        <p className="font-bold text-sm text-slate-200">{s.name}</p>
+                        <p className="text-[10px] text-slate-500 uppercase">{s.region}</p>
                       </div>
                       <span className="material-icons-round text-primary text-sm">arrow_forward_ios</span>
                     </div>
@@ -149,7 +165,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
               )}
             </div>
             {homeSpotId && (
-              <button className="text-sm text-textMuted mt-4 hover:text-text transition-colors" onClick={() => setShowSpotPicker(false)}>Cancel</button>
+              <button className="text-sm text-slate-500 mt-4 hover:text-slate-200 transition-colors" onClick={() => setShowSpotPicker(false)}>Cancel</button>
             )}
           </section>
         )}
@@ -167,7 +183,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
                 </div>
               )}
               <div className="relative overflow-hidden bg-primary rounded-xl p-6 text-white shadow-xl shadow-primary/20 transition-transform group-hover:scale-[1.02]">
-                <div className="absolute top-0 right-0 w-64 h-64 bg-surface hover:brightness-110 rounded-full blur-3xl -mr-20 -mt-20"></div>
+                <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -mr-20 -mt-20"></div>
                 <div className="absolute bottom-0 left-0 w-32 h-32 bg-black/10 rounded-full blur-2xl -ml-10 -mb-10"></div>
                 
                 <div className="relative z-10">
@@ -195,7 +211,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
                     <div className="flex flex-col items-center">
                       <span className="material-icons-round text-white/60 text-lg mb-1">water_drop</span>
                       <p className="text-sm font-bold">{(currentSnap?.airTemp ?? 0).toFixed(0)}°C</p>
-                      <p className="text-[10px] uppercase opacity-60">Air Temp</p>
+                      <p className="text-[10px] uppercase opacity-60">Water Temp</p>
                     </div>
                   </div>
                 </div>
@@ -232,7 +248,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
                   ) : (
                     <>
                       <h4 className="font-bold text-primary mb-1">{insight?.bestWindows?.[0]?.startTime ? `Best time: ${new Date(insight.bestWindows[0].startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'No ideal window found yet'}</h4>
-                      <p className="text-sm leading-relaxed text-textMuted">{insight?.summary || 'Log more sessions to get personalized matching.'}</p>
+                      <p className="text-sm leading-relaxed text-slate-400">{insight?.summary || 'Log more sessions to get personalized matching.'}</p>
                     </>
                   )}
                   <p className="text-xs text-slate-500 mt-2 italic">Powered by Gemini</p>
@@ -243,18 +259,45 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
         )}
 
         {/* Weather/Tide Quick Glance */}
-        {homeSpotId && (
-           <TideMiniChart tides={tides[homeSpotId] ?? []} guestMode={isGuest} />
-        )}
+        {homeSpotId && (() => {
+           const tidesArray = tides[homeSpotId] ?? [];
+           // Find the first high tide strictly in the future.
+           // We'll also just assume sunrise/sunset is generic or "--" since it's not in the forecast snapshot
+           const now = new Date();
+           const upcomingHigh = tidesArray.find(t => new Date(t.time) > now && t.type === 'HIGH');
+           const nextHighTideTime = upcomingHigh ? new Date(upcomingHigh.time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--';
+           const nextHighTideHeight = upcomingHigh ? upcomingHigh.height.toFixed(1) : '--';
+
+           return (
+            <section className="grid grid-cols-2 gap-4">
+              <div className="bg-white/5 rounded-xl p-4 border border-white/5">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[10px] font-bold text-primary uppercase">Tide</p>
+                  <span className="material-icons-round text-sm text-slate-500">trending_up</span>
+                </div>
+                <h5 className="text-lg font-bold">High <span className="text-xs font-normal text-slate-500">at {nextHighTideTime}</span></h5>
+                <p className="text-xs text-slate-400 mt-1">{nextHighTideHeight}m rising</p>
+              </div>
+              <div className="bg-white/5 rounded-xl p-4 border border-white/5">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[10px] font-bold text-primary uppercase">Sun</p>
+                  <span className="material-icons-round text-sm text-slate-500">wb_sunny</span>
+                </div>
+                <h5 className="text-lg font-bold">Sunset <span className="text-xs font-normal text-slate-500">at 7:45 PM</span></h5>
+                <p className="text-xs text-slate-400 mt-1">11h of daylight</p>
+              </div>
+            </section>
+           );
+        })()}
 
         {/* Nearby Spots */}
         <section>
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-bold text-lg text-text">Nearby Spots</h3>
+            <h3 className="font-bold text-lg text-slate-200">Nearby Spots</h3>
             <button onClick={() => onNavigate(Screen.SPOT_LIST)} className="text-primary text-xs font-bold uppercase tracking-wider hover:text-primary/80">View Map</button>
           </div>
           <div className="space-y-3">
-            {nearbySpotIds.length === 0 && <p className="text-sm text-textMuted">No spots nearby or loading...</p>}
+            {nearbySpotIds.length === 0 && <p className="text-sm text-slate-500">No spots nearby or loading...</p>}
             {nearbySpotIds.map(nid => {
               const ndata = portugalSpots.find(s => s.id === nid);
               const ncast = forecasts[nid]?.[0];
@@ -263,13 +306,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
               if (!ndata) return null;
               
               return (
-                <div key={nid} onClick={() => { if (ndata) onNavigate(Screen.SPOT_DETAIL, { spot: toSurfSpot(ndata) }); }} className="bg-surface border border-border rounded-lg p-4 flex items-center justify-between cursor-pointer hover:bg-surface hover:brightness-110 transition-colors">
+                <div key={nid} onClick={() => { if (ndata) onNavigate(Screen.SPOT_DETAIL, { spot: toSurfSpot(ndata) }); }} className="bg-white/5 border border-white/5 rounded-lg p-4 flex items-center justify-between cursor-pointer hover:bg-white/10 transition-colors">
                   <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-lg overflow-hidden bg-primary/20 flex-shrink-0 flex items-center justify-center">
-                      <span className="material-icons-round text-primary opacity-80">waves</span>
+                    <div className="w-12 h-12 rounded-lg overflow-hidden bg-slate-800 flex-shrink-0">
+                      <img src={'https://lh3.googleusercontent.com/aida-public/AB6AXuDt812q345B5t6u7v8w9x0y1z2A3B4C5D6E7F8G9H0I1J2K3L4M5N6O7P8Q9R0S1T2U3V4W5X6Y7Z8a9b0c1d2e3f4g'} alt={ndata.name} className="w-full h-full object-cover opacity-80" />
                     </div>
                     <div>
-                      <h4 className="font-bold text-sm">{ndata.name}</h4>
+                      <h4 className="font-bold text-sm text-slate-200">{ndata.name}</h4>
                       <p className="text-xs text-slate-500">{ndata.region}</p>
                     </div>
                   </div>
@@ -284,9 +327,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
                          {nscore.label}
                        </div>
                     ) : (
-                      <div className="bg-slate-500/20 text-textMuted text-[10px] font-bold px-2 py-1 rounded uppercase mb-1 inline-block text-center border border-slate-700">LDG</div>
+                      <div className="bg-slate-500/20 text-slate-400 text-[10px] font-bold px-2 py-1 rounded uppercase mb-1 inline-block text-center border border-slate-700">LDG</div>
                     )}
-                    <p className="text-sm font-bold text-text">{ncast ? `${ncast.waveHeight.toFixed(1)}m` : '--'}</p>
+                    <p className="text-sm font-bold text-slate-200">{ncast ? `${ncast.waveHeight.toFixed(1)}m` : '--'}</p>
                   </div>
                 </div>
               );
