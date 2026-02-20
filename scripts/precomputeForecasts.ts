@@ -65,13 +65,12 @@ async function fetchEnsembleForecast(lat: number, lon: number): Promise<Forecast
     forecast_days: '7',
   };
 
-  // Fetch Marine data (Waves + Tides)
-  // We request multiple models: best_match (weighted ensemble), ecmwf, and gfs
+  // Fetch Marine data (Waves)
+  // We request multiple models: best_match (weighted ensemble) and meteofrance_wave (Copernicus/High-Res)
   const marineParams = new URLSearchParams({
     ...base,
     hourly: 'wave_height,wave_period,swell_wave_height,swell_wave_direction',
-    models: 'best_match,ecmwf,gfs_global',
-    daily: 'tide_amplitude', // Open-Meteo Marine has limited tide data, using best available
+    models: 'best_match,meteofrance_wave',
   });
 
   // Fetch Atmos data
@@ -86,7 +85,9 @@ async function fetchEnsembleForecast(lat: number, lon: number): Promise<Forecast
   ]);
 
   if (!marineRes.ok || !atmRes.ok) {
-    throw new Error(`API Failure: Marine=${marineRes.status}, ATM=${atmRes.status}`);
+    const mErr = !marineRes.ok ? await marineRes.text() : 'OK';
+    const aErr = !atmRes.ok ? await atmRes.text() : 'OK';
+    throw new Error(`API Failure: Marine=${marineRes.status} (${mErr}), ATM=${atmRes.status} (${aErr})`);
   }
 
   const marine = await marineRes.json();
@@ -101,23 +102,22 @@ async function fetchEnsembleForecast(lat: number, lon: number): Promise<Forecast
     const hourDiff = Math.floor((new Date(t).getTime() - Date.now()) / 3600000);
 
     // CONSENSUS ALGORITHM
-    // Open-Meteo provides multiple models in the response if 'models' param is used.
-    // Format is wave_height_best_match, wave_height_ecmwf, wave_height_gfs_global
-    const whBest = mHourly.wave_height_best_match?.[i] || 0;
-    const whEcmwf = mHourly.wave_height_ecmwf?.[i] || whBest;
-    const whGfs = mHourly.wave_height_gfs_global?.[i] || whBest;
+    // Format is variable_marine_best_match and variable_meteofrance_wave
+    const whBest = mHourly.wave_height_marine_best_match?.[i] || 0;
+    const whMF = mHourly.wave_height_meteofrance_wave?.[i] || whBest;
 
     let finalWaveHeight: number;
     if (hourDiff <= 48) {
-      // Prioritize High-Res (ECMWF)
-      finalWaveHeight = whEcmwf;
+      // Prioritize High-Res (MeteoFrance/Copernicus)
+      finalWaveHeight = whMF;
     } else {
-      // Consensus between GFS and Best Match
-      finalWaveHeight = (whGfs + whBest) / 2;
+      // Consensus
+      finalWaveHeight = (whMF + whBest) / 2;
     }
 
     // CONFIDENCE CALCULATION
-    const divergence = Math.abs(whEcmwf - whGfs) / ((whEcmwf + whGfs) / 2 || 1);
+    const avg = (whMF + whBest) / 2 || 1;
+    const divergence = Math.abs(whMF - whBest) / avg;
     const confidence = divergence > 0.20 ? 'LOW' : divergence > 0.10 ? 'MEDIUM' : 'HIGH';
 
     return {
@@ -125,9 +125,9 @@ async function fetchEnsembleForecast(lat: number, lon: number): Promise<Forecast
       runTime: now,
       forecastHour: t,
       waveHeight: parseFloat(finalWaveHeight.toFixed(2)),
-      wavePeriod: mHourly.wave_period_best_match?.[i] || 0,
-      swellDirection: mHourly.swell_wave_direction_best_match?.[i] || 0,
-      swellHeight: mHourly.swell_wave_height_best_match?.[i] || 0,
+      wavePeriod: mHourly.wave_period_marine_best_match?.[i] || 0,
+      swellDirection: mHourly.swell_wave_direction_marine_best_match?.[i] || 0,
+      swellHeight: mHourly.swell_wave_height_marine_best_match?.[i] || 0,
       windSpeed: aHourly.windspeed_10m?.[i] || 0,
       windDirection: aHourly.winddirection_10m?.[i] || 0,
       windGust: aHourly.windgusts_10m?.[i] || 0,
