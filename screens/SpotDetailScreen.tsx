@@ -83,14 +83,14 @@ export const SpotDetailScreen: React.FC<SpotDetailScreenProps> = ({ spot, onNavi
   useEffect(() => {
     if (activeTab === 'ANALYSIS' && localForecasts.length > 0 && spot && !isGuest) {
       setLoadingInsight(true);
-      getGeminiInsight(localForecasts, spot.breakProfile || {} as any, sessions, preferredWaveHeight || { min: 0.5, max: 3.0 })
+      getGeminiInsight(localForecasts, spot.breakProfile!, sessions, preferredWaveHeight || { min: 0.5, max: 3.0 })
         .then(setInsight)
         .catch(console.error)
         .finally(() => setLoadingInsight(false));
     }
   }, [activeTab, localForecasts, spot, isGuest, sessions, preferredWaveHeight]);
 
-  const currentCondition = localForecasts[0] ? computeSwellQuality(localForecasts[0], spot?.breakProfile || {} as any) : null;
+  const currentCondition = localForecasts[0] ? computeSwellQuality(localForecasts[0], spot?.breakProfile!) : null;
 
   const chartData = useMemo(() => {
     if (!localForecasts.length) return [];
