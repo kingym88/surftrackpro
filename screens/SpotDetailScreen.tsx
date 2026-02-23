@@ -21,6 +21,12 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 
+const getCardinalDirection = (degrees: number) => {
+  const directions = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+  const index = Math.round((degrees % 360) / 22.5);
+  return directions[index % 16];
+};
+
 interface SpotDetailScreenProps {
   spot: SurfSpot | null;
   onNavigate: (screen: Screen) => void;
@@ -35,6 +41,7 @@ export const SpotDetailScreen: React.FC<SpotDetailScreenProps> = ({ onNavigate, 
   const units = useUnits();
   const { user } = useAuth();
   
+  const [selectedDay, setSelectedDay] = useState<string>('NOW');
   const [localForecasts, setLocalForecasts] = useState<ForecastSnapshot[]>([]);
   const [isStale, setIsStale] = useState(false);
   const [loadingForecast, setLoadingForecast] = useState(false);
@@ -93,23 +100,60 @@ export const SpotDetailScreen: React.FC<SpotDetailScreenProps> = ({ onNavigate, 
     }
   }, [activeTab, localForecasts, spot, isGuest, sessions, preferredWaveHeight]);
 
-  const currentCondition = localForecasts[0] ? computeSwellQuality(localForecasts[0], spot?.breakProfile!) : null;
+  const currentCondition = useMemo(() => {
+    if (!localForecasts.length || !spot?.breakProfile) return null;
+    
+    if (selectedDay === 'NOW') {
+      return computeSwellQuality(localForecasts[0], spot.breakProfile);
+    }
+    
+    const daySnapshots = localForecasts.filter(f => 
+      new Date(f.forecastHour).toISOString().slice(0, 10) === selectedDay
+    );
+    
+    if (!daySnapshots.length) return null;
+    
+    const peakSnapshot = daySnapshots.reduce((max, f) => 
+      f.waveHeight > max.waveHeight ? f : max
+    , daySnapshots[0]);
+    
+    return computeSwellQuality(peakSnapshot, spot.breakProfile);
+  }, [localForecasts, selectedDay, spot?.breakProfile]);
 
   const chartData = useMemo(() => {
     if (!localForecasts.length) return [];
-    const daily: Record<string, { waveHt: number[], period: number[] }> = {};
+    const daily: Record<string, { waveHt: number[], period: number[], windSpd: number[], windDirs: number[] }> = {};
     localForecasts.forEach(f => {
       const day = new Date(f.forecastHour).toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
-      if (!daily[day]) daily[day] = { waveHt: [], period: [] };
+      if (!daily[day]) daily[day] = { waveHt: [], period: [], windSpd: [], windDirs: [] };
       daily[day].waveHt.push(f.waveHeight);
       daily[day].period.push(f.wavePeriod);
+      daily[day].windSpd.push(f.windSpeed);
+      daily[day].windDirs.push(f.windDirection);
     });
 
-    return Object.keys(daily).slice(0, 7).map(day => ({
-      day,
-      waveHeight: Math.max(...daily[day].waveHt),
-      period: Math.round(daily[day].period.reduce((a, b) => a + b, 0) / daily[day].period.length),
-    }));
+    return Object.keys(daily).slice(0, 7).map(day => {
+      const avgWindSpeed = Number((daily[day].windSpd.reduce((a, b) => a + b, 0) / daily[day].windSpd.length).toFixed(1));
+      
+      const dirCounts: Record<number, number> = {};
+      let mostCommonDir = daily[day].windDirs[0];
+      let maxCount = 0;
+      daily[day].windDirs.forEach(dir => {
+        dirCounts[dir] = (dirCounts[dir] || 0) + 1;
+        if (dirCounts[dir] > maxCount) {
+          maxCount = dirCounts[dir];
+          mostCommonDir = dir;
+        }
+      });
+      
+      return {
+        day,
+        waveHeight: Math.max(...daily[day].waveHt),
+        period: Math.round(daily[day].period.reduce((a, b) => a + b, 0) / daily[day].period.length),
+        windSpeed: avgWindSpeed,
+        windDirection: getCardinalDirection(mostCommonDir)
+      };
+    });
   }, [localForecasts]);
 
   if (!spot) return (
@@ -175,11 +219,51 @@ export const SpotDetailScreen: React.FC<SpotDetailScreenProps> = ({ onNavigate, 
               </div>
             )}
             
+            <div className="flex gap-2 pb-2 overflow-x-auto snap-x hide-scrollbar">
+              <button
+                onClick={() => setSelectedDay('NOW')}
+                className={`snap-start shrink-0 px-4 py-2 rounded-xl text-center transition-colors ${
+                  selectedDay === 'NOW'
+                    ? 'bg-text text-background'
+                    : 'bg-surface text-textMuted border border-border'
+                }`}
+              >
+                <div className="text-xs font-bold uppercase">NOW</div>
+              </button>
+              {Array.from(new Set(localForecasts.map(f => new Date(f.forecastHour).toISOString().slice(0, 10)))).map((dateStr: string) => {
+                const dateObj = new Date(dateStr);
+                const abbrDay = dateObj.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' }).toUpperCase();
+                const [y, m, d] = dateStr.split('-');
+                const displayDate = `${d}/${m}`;
+                return (
+                  <button
+                    key={dateStr}
+                    onClick={() => setSelectedDay(dateStr)}
+                    className={`snap-start shrink-0 px-4 py-2 rounded-xl text-center transition-colors ${
+                      selectedDay === dateStr
+                        ? 'bg-text text-background'
+                        : 'bg-surface text-textMuted border border-border'
+                    }`}
+                  >
+                    <div className="text-xs font-bold uppercase">{abbrDay}</div>
+                    <div className="text-[10px] opacity-70 mt-0.5">{displayDate}</div>
+                  </button>
+                );
+              })}
+            </div>
+
             {/* 7.2 Swell Quality Score Card */}
             {currentCondition && (
                <div className="flex flex-col items-center justify-center bg-surface border border-border rounded-xl p-6 text-center shadow-lg relative overflow-hidden">
                  <div className={`absolute -top-10 -right-10 w-32 h-32 blur-3xl opacity-20 rounded-full ${currentCondition.label === 'EPIC' ? 'bg-accent1' : currentCondition.label === 'GOOD' ? 'bg-primary' : currentCondition.label === 'FAIR' ? 'bg-accent2' : 'bg-red-500'}`}></div>
-                 <p className="text-[10px] font-bold tracking-widest uppercase text-textMuted mb-2">Live Condition</p>
+                 <p className="text-[10px] font-bold tracking-widest uppercase text-textMuted mb-2">
+                   {selectedDay === 'NOW' ? 'Live Condition' : (() => {
+                     const dateObj = new Date(selectedDay);
+                     const abbrDay = dateObj.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' }).toUpperCase();
+                     const [, m, d] = selectedDay.split('-');
+                     return `${abbrDay} ${d}/${m}`;
+                   })()}
+                 </p>
                  <h2 className={`text-4xl font-black tracking-tight mb-2 ${currentCondition.label === 'EPIC' ? 'text-accent1' : currentCondition.label === 'GOOD' ? 'text-primary' : currentCondition.label === 'FAIR' ? 'text-accent2' : 'text-red-500'}`}>
                    {currentCondition.label}
                  </h2>
@@ -212,8 +296,20 @@ export const SpotDetailScreen: React.FC<SpotDetailScreenProps> = ({ onNavigate, 
                         <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{fill: 'var(--color-primary)'}} />
                         <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{fill: 'var(--color-accent2)'}} />
                         <Tooltip 
-                           contentStyle={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)', borderRadius: '12px', color: 'var(--color-text)' }}
-                           itemStyle={{ fontSize: '12px', fontWeight: 'bold' }}
+                           content={({ active, payload, label }) => {
+                             if (active && payload && payload.length) {
+                               const data = payload[0].payload;
+                               return (
+                                 <div className="bg-surface border border-border p-3 rounded-xl shadow-lg">
+                                   <div className="text-text text-xs font-bold uppercase mb-1">{label}</div>
+                                   <div className="text-xs text-text mb-0.5">Period (s): {data.period}</div>
+                                   <div className="text-xs text-text mb-0.5">Wave Ht (ft): {data.waveHeight}</div>
+                                   <div className="text-xs text-text">Wind (km/h): {data.windSpeed} {data.windDirection}</div>
+                                 </div>
+                               );
+                             }
+                             return null;
+                           }}
                         />
                         <Bar yAxisId="left" dataKey="waveHeight" fill="var(--color-primary)" radius={[4, 4, 0, 0]} name="Wave Ht (ft)" barSize={20} />
                         <Line yAxisId="right" type="monotone" dataKey="period" stroke="var(--color-accent2)" strokeWidth={3} dot={{r:4, fill: 'var(--color-surface)', strokeWidth: 2}} name="Period (s)" />
@@ -245,13 +341,14 @@ export const SpotDetailScreen: React.FC<SpotDetailScreenProps> = ({ onNavigate, 
                       <th className="py-2 px-3 uppercase text-[10px] tracking-wider">Wave Ht</th>
                       <th className="py-2 px-3 uppercase text-[10px] tracking-wider">Period</th>
                       <th className="py-2 px-3 uppercase text-[10px] tracking-wider">Swell Dir</th>
+                      <th className="py-2 px-3 uppercase text-[10px] tracking-wider">Wind Dir</th>
                       <th className="py-2 px-3 uppercase text-[10px] tracking-wider">Wind</th>
                       <th className="py-2 px-3 uppercase text-[10px] tracking-wider">Gust</th>
                       <th className="py-2 px-3 uppercase text-[10px] tracking-wider">Quality</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border text-text">
-                    {localForecasts.map((f, i) => {
+                    {(selectedDay === 'NOW' ? localForecasts : localForecasts.filter(f => new Date(f.forecastHour).toISOString().slice(0, 10) === selectedDay)).map((f, i) => {
                       const time = new Date(f.forecastHour).toLocaleTimeString([], { hour: 'numeric' });
                       const isGuestBlur = isGuest && i > 24; 
                       
@@ -265,6 +362,7 @@ export const SpotDetailScreen: React.FC<SpotDetailScreenProps> = ({ onNavigate, 
                           <td className="py-3 px-3">
                             <span className="material-icons-round text-sm" style={{ rotate: `${f.swellDirection}deg` }}>north</span>
                           </td>
+                          <td className="py-3 px-3 font-bold">{getCardinalDirection(f.windDirection)}</td>
                           <td className="py-3 px-3 font-bold">{units.speed(f.windSpeed)}</td>
                           <td className="py-3 px-3 text-textMuted">{f.windGust.toFixed(0)}</td>
                           <td className="py-3 px-3">
@@ -279,7 +377,7 @@ export const SpotDetailScreen: React.FC<SpotDetailScreenProps> = ({ onNavigate, 
                         return (
                            <div key={i} className="contents relative">
                               {i === 25 ? <tr className="relative">
-                                 <td colSpan={7} className="p-0">
+                                 <td colSpan={8} className="p-0">
                                    <GuestGate featureName="Full hourly forecast" onNavigate={onNavigate}>
                                      <div className="h-32 blur-sm opacity-40 bg-surface"></div>
                                    </GuestGate>
