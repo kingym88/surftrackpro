@@ -23,6 +23,7 @@ interface DayCard {
 interface ForecastStripProps {
   forecasts: ForecastSnapshot[];
   spotId?: string;
+  coords?: { lat: number; lng: number };
   onDaySelect?: (date: string) => void;
   /** Guest users see only today/tomorrow */
   isGuest?: boolean;
@@ -52,6 +53,7 @@ function formatDay(isoString: string, index: number): string {
 
 export const ForecastStrip: React.FC<ForecastStripProps> = ({
   forecasts,
+  coords = { lat: 39.36, lng: -9.38 }, // Default: Peniche, Portugal
   onDaySelect,
   isGuest = false,
   onNavigate,
@@ -81,7 +83,7 @@ export const ForecastStrip: React.FC<ForecastStripProps> = ({
       return h >= 8 && h <= 10;
     }) ?? snaps[0];
 
-    const score = computeSwellQuality(midMorning, DEFAULT_BREAK_PROFILE);
+    const score = computeSwellQuality(midMorning, DEFAULT_BREAK_PROFILE, coords);
     score.spotId = 'strip';
 
     return {

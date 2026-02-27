@@ -1,3 +1,4 @@
+import * as SunCalc from 'suncalc';
 import type { ForecastSnapshot, SpotBreakProfile, SwellQualityScore } from '@/types';
 
 // ─── Scoring weights ──────────────────────────────────────────────────────────
@@ -32,14 +33,28 @@ function compassToDeg(c: string): number {
 export function computeSwellQuality(
   forecast: ForecastSnapshot,
   profile: SpotBreakProfile | undefined,
+  coords: { lat: number; lng: number },
 ): SwellQualityScore {
+  // ── Daylight gate — score 0 outside sunrise/sunset ─────────────────────────
+  const forecastDate = new Date(forecast.forecastHour);
+  const sunTimes = SunCalc.getTimes(forecastDate, coords.lat, coords.lng);
+  if (forecastDate < sunTimes.sunrise || forecastDate > sunTimes.sunset) {
+    return {
+      spotId: '',
+      forecastHour: forecast.forecastHour,
+      score: 0,
+      label: 'POOR',
+      confidence: 'LOW',
+      reasons: ['Outside daylight hours'],
+    };
+  }
+
   const safeProfile = profile || { breakType: 'beach', facingDirection: 'W', optimalSwellDirection: 'W-NW', optimalTidePhase: 'mid', optimalWindDirection: 'E' };
-  
+
   const reasons: string[] = [];
   let totalScore = 0;
 
   // ── 1. Wave Height ──────────────────────────────────────────────────────────
-  // Beach breaks typically ideal 1–3m; reef/point can handle bigger
   const h = forecast.waveHeight;
   let heightScore = 0;
   const optimalMin = safeProfile.breakType === 'reef' ? 1.0 : 0.8;
@@ -83,10 +98,8 @@ export function computeSwellQuality(
   totalScore += periodScore;
 
   // ── 3. Wind Direction vs Break Orientation ──────────────────────────────────
-  // Offshore wind = wind blowing from land to sea (grooms waves)
-  // The spot's facingDirection is where waves come FROM, so offshore = opposite direction
   const breakFacingDeg = compassToDeg(safeProfile.facingDirection);
-  const offshoreDeg = (breakFacingDeg + 180) % 360; // land side
+  const offshoreDeg = (breakFacingDeg + 180) % 360;
   const windDiff = bearingDiff(forecast.windDirection, offshoreDeg);
   let windScore = 0;
 
@@ -106,8 +119,6 @@ export function computeSwellQuality(
   totalScore += windScore;
 
   // ── 4. Swell Direction Alignment ───────────────────────────────────────────
-  // Optimal swell direction is specified as a range like "W-NW"
-  // Parse the first bearing from the optimal direction
   const optSwellParts = safeProfile.optimalSwellDirection.split('-');
   const optSwellDeg = compassToDeg(optSwellParts[0].trim());
   const swellDiff = bearingDiff(forecast.swellDirection, optSwellDeg);
@@ -129,15 +140,11 @@ export function computeSwellQuality(
   totalScore += swellDirScore;
 
   // ── 5. Tide Phase ───────────────────────────────────────────────────────────
-  // Simplified: use hour of day to approximate tide phase
-  const hour = new Date(forecast.forecastHour).getUTCHours();
+  // TODO: replace with real tide data — use tides[] array keyed by spot when available.
+  // Using 'mid' as a neutral fallback so tide phase never incorrectly penalises scoring.
+  const currentTidePhase: 'low' | 'mid' | 'high' = 'mid';
+
   let tideScore = 0;
-
-  // For the simplified version, assume:
-  // 0–3h: low tide zone, 4–9h: mid tide zone, 10–14h: high tide zone, etc. (rough pattern)
-  const currentTidePhase: 'low' | 'mid' | 'high' =
-    hour % 12 < 3 ? 'low' : hour % 12 < 9 ? 'mid' : 'high';
-
   if (safeProfile.optimalTidePhase === 'any' || currentTidePhase === safeProfile.optimalTidePhase) {
     tideScore = WEIGHTS.tidePhase;
     reasons.push(`Tide phase (${currentTidePhase}) matches optimal for this break.`);

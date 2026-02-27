@@ -113,7 +113,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
     return "Onshore";
   };
 
-  const qualityScore = currentSnap ? computeSwellQuality(currentSnap, (homeSpot as any)?.breakProfile || {} as any) : null;
+  const qualityScore = currentSnap ? computeSwellQuality(currentSnap, (homeSpot as any)?.breakProfile || {} as any, { lat: homeSpot?.latitude ?? 0, lng: homeSpot?.longitude ?? 0 }) : null;
 
   return (
     <div className="pb-24">
@@ -334,7 +334,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
             {nearbySpotIds.map(nid => {
               const ndata = PORTUGAL_SPOTS.find(s => s.id === nid);
               const ncast = forecasts[nid]?.[0];
-              const nscore = ncast ? computeSwellQuality(ncast, (ndata as any)?.breakProfile || {} as any) : null;
+              const nscore = ncast ? computeSwellQuality(ncast, (ndata as any)?.breakProfile || {} as any, { lat: ndata?.latitude ?? 0, lng: ndata?.longitude ?? 0 }) : null;
               
               if (!ndata) return null;
               

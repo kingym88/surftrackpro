@@ -114,7 +114,7 @@ export const SpotDetailScreen: React.FC<SpotDetailScreenProps> = ({ onNavigate, 
     if (!localForecasts.length || !spot?.breakProfile) return null;
     
     if (selectedDay === 'NOW') {
-      return computeSwellQuality(localForecasts[0], spot.breakProfile);
+      return computeSwellQuality(localForecasts[0], spot.breakProfile, spot.coordinates);
     }
     
     const daySnapshots = localForecasts.filter(f => 
@@ -127,7 +127,7 @@ export const SpotDetailScreen: React.FC<SpotDetailScreenProps> = ({ onNavigate, 
       f.waveHeight > max.waveHeight ? f : max
     , daySnapshots[0]);
     
-    return computeSwellQuality(peakSnapshot, spot.breakProfile);
+    return computeSwellQuality(peakSnapshot, spot.breakProfile, spot.coordinates);
   }, [localForecasts, selectedDay, spot?.breakProfile]);
 
   const chartData = useMemo(() => {
@@ -329,7 +329,7 @@ export const SpotDetailScreen: React.FC<SpotDetailScreenProps> = ({ onNavigate, 
                       const time = new Date(f.forecastHour).toLocaleTimeString([], { hour: 'numeric' });
                       const isGuestBlur = isGuest && i > 24; 
                       
-                      const qScore = computeSwellQuality(f, spot?.breakProfile || {} as any);
+                      const qScore = computeSwellQuality(f, spot?.breakProfile || {} as any, spot?.coordinates || { lat: 0, lng: 0 });
                       
                       const RowContent = (
                         <tr key={i} className="hover:bg-background/50 transition-colors">

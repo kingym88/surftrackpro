@@ -76,7 +76,7 @@ export const SurfMatchScreen: React.FC = () => {
                         const hr = new Date(snap.forecastHour).getUTCHours();
                         if (hr < 6 || hr > 19) continue; // Daylight filter logic constraints
 
-                        const computedScore = computeSwellQuality(snap, s.breakProfile);
+                        const computedScore = computeSwellQuality(snap, s.breakProfile, s.coordinates);
                         if (!optimizedWindow || computedScore.score > optimizedWindow.score.score) {
                             optimizedWindow = { spot: s, forecast: snap, score: computedScore };
                         }
