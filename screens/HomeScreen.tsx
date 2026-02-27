@@ -36,7 +36,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
 
   const homeSpot = PORTUGAL_SPOTS.find(s => s.id === homeSpotId);
   const homeForecast = homeSpotId ? forecasts[homeSpotId] : undefined;
-  const currentSnap = homeForecast?.[0];
+  const currentSnap = homeForecast && homeForecast.length > 0
+    ? homeForecast.reduce((closest, snap) => {
+        const now = Date.now();
+        const closestDiff = Math.abs(new Date(closest.forecastHour).getTime() - now);
+        const snapDiff    = Math.abs(new Date(snap.forecastHour).getTime() - now);
+        return snapDiff < closestDiff ? snap : closest;
+      })
+    : undefined;
 
   useEffect(() => {
     if (homeSpotId && homeForecast && !isGuest && homeSpot) {

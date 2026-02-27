@@ -21,6 +21,7 @@ export async function fetchOpenMeteoForecast(
     ...commonParams,
     hourly:
       'temperature_2m,precipitation,cloudcover,pressure_msl,windspeed_10m,winddirection_10m,windgusts_10m',
+    models: 'icon_seamless',
   });
 
   const marineParams = new URLSearchParams({
@@ -79,7 +80,7 @@ function mergeToForecastSnapshots(
 
   for (let i = 0; i < times.length; i++) {
     snapshots.push({
-      modelName: 'open-meteo',
+      modelName: 'icon_seamless',
       runTime: new Date().toISOString(),
       forecastHour: times[i],
       // Atmospheric

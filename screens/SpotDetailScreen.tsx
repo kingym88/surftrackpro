@@ -10,6 +10,7 @@ import { fetchOpenMeteoForecast } from '@/src/services/openMeteo';
 import { useUnits } from '@/src/hooks/useUnits';
 import { computeSwellQuality } from '@/src/services/swellQuality';
 import { getGeminiInsight } from '@/src/services/geminiInsight';
+import { fetchTidePredictions } from '@/src/services/tides';
 import {
   ComposedChart,
   Line,
@@ -78,6 +79,15 @@ export const SpotDetailScreen: React.FC<SpotDetailScreenProps> = ({ onNavigate, 
         if (!fetchedFresh && cached) {
           setLocalForecasts(cached.data);
           setIsStale(true);
+        }
+
+        // Fetch tide predictions for today and wire into global tides state
+        try {
+          const todayStr = now.toISOString().slice(0, 10);
+          const tidePts = await fetchTidePredictions(spot.coordinates.lat, spot.coordinates.lng, todayStr);
+          setTides(spot.id, tidePts);
+        } catch (tideErr) {
+          console.warn('Tide fetch failed, chart will use cached/synthetic data', tideErr);
         }
       } catch (e) {
         console.error('Error loading forecast', e);
@@ -218,39 +228,6 @@ export const SpotDetailScreen: React.FC<SpotDetailScreenProps> = ({ onNavigate, 
                 Data may be outdated — live fetch failed.
               </div>
             )}
-            
-            <div className="flex gap-2 pb-2 overflow-x-auto snap-x hide-scrollbar">
-              <button
-                onClick={() => setSelectedDay('NOW')}
-                className={`snap-start shrink-0 px-4 py-2 rounded-xl text-center transition-colors ${
-                  selectedDay === 'NOW'
-                    ? 'bg-text text-background'
-                    : 'bg-surface text-textMuted border border-border'
-                }`}
-              >
-                <div className="text-xs font-bold uppercase">NOW</div>
-              </button>
-              {Array.from(new Set(localForecasts.map(f => new Date(f.forecastHour).toISOString().slice(0, 10)))).map((dateStr: string) => {
-                const dateObj = new Date(dateStr);
-                const abbrDay = dateObj.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' }).toUpperCase();
-                const [y, m, d] = dateStr.split('-');
-                const displayDate = `${d}/${m}`;
-                return (
-                  <button
-                    key={dateStr}
-                    onClick={() => setSelectedDay(dateStr)}
-                    className={`snap-start shrink-0 px-4 py-2 rounded-xl text-center transition-colors ${
-                      selectedDay === dateStr
-                        ? 'bg-text text-background'
-                        : 'bg-surface text-textMuted border border-border'
-                    }`}
-                  >
-                    <div className="text-xs font-bold uppercase">{abbrDay}</div>
-                    <div className="text-[10px] opacity-70 mt-0.5">{displayDate}</div>
-                  </button>
-                );
-              })}
-            </div>
 
             {/* 7.2 Swell Quality Score Card */}
             {currentCondition && (
@@ -327,7 +304,7 @@ export const SpotDetailScreen: React.FC<SpotDetailScreenProps> = ({ onNavigate, 
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-sm font-bold tracking-tight uppercase text-text">Tide Cycle</h3>
               </div>
-              <TideMiniChart guestMode={isGuest} tides={[]} />
+              <TideMiniChart guestMode={isGuest} tides={tides[spot.id] ?? []} />
             </section>
 
             {/* 7.3 Detailed Breakdown Table */}
@@ -452,6 +429,42 @@ export const SpotDetailScreen: React.FC<SpotDetailScreenProps> = ({ onNavigate, 
             </button>
           ))}
         </div>
+
+        {/* Sticky date selector — only on Forecast tab */}
+        {activeTab === 'FORECAST' && (
+          <div className="flex gap-2 px-4 pb-3 overflow-x-auto snap-x hide-scrollbar">
+            <button
+              onClick={() => setSelectedDay('NOW')}
+              className={`snap-start shrink-0 px-4 py-2 rounded-xl text-center transition-colors ${
+                selectedDay === 'NOW'
+                  ? 'bg-text text-background'
+                  : 'bg-surface text-textMuted border border-border'
+              }`}
+            >
+              <div className="text-xs font-bold uppercase">NOW</div>
+            </button>
+            {Array.from(new Set(localForecasts.map(f => new Date(f.forecastHour).toISOString().slice(0, 10)))).map((dateStr: string) => {
+              const dateObj = new Date(dateStr);
+              const abbrDay = dateObj.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' }).toUpperCase();
+              const [, m, d] = dateStr.split('-');
+              const displayDate = `${d}/${m}`;
+              return (
+                <button
+                  key={dateStr}
+                  onClick={() => setSelectedDay(dateStr)}
+                  className={`snap-start shrink-0 px-4 py-2 rounded-xl text-center transition-colors ${
+                    selectedDay === dateStr
+                      ? 'bg-text text-background'
+                      : 'bg-surface text-textMuted border border-border'
+                  }`}
+                >
+                  <div className="text-xs font-bold uppercase">{abbrDay}</div>
+                  <div className="text-[10px] opacity-70 mt-0.5">{displayDate}</div>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </header>
 
       <main className="px-4 py-6">
