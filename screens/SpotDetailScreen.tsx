@@ -337,9 +337,17 @@ export const SpotDetailScreen: React.FC<SpotDetailScreenProps> = ({ onNavigate, 
                           <td className="py-3 px-3 font-bold text-primary">{units.height(f.waveHeight)}</td>
                           <td className="py-3 px-3 text-textMuted">{f.wavePeriod.toFixed(0)}s</td>
                           <td className="py-3 px-3">
-                            <span className="material-icons-round text-sm" style={{ rotate: `${f.swellDirection}deg` }}>north</span>
+                            <div className="flex flex-col items-center gap-0.5">
+                              <span className="material-icons-round text-sm" style={{ rotate: `${f.swellDirection}deg` }}>north</span>
+                              <span className="text-[10px] text-textMuted font-bold">{getCardinalDirection(f.swellDirection)}</span>
+                            </div>
                           </td>
-                          <td className="py-3 px-3 font-bold">{getCardinalDirection(f.windDirection)}</td>
+                          <td className="py-3 px-3 font-bold">
+                            <div className="flex flex-col items-center gap-0.5">
+                              <span className="material-icons-round text-sm" style={{ rotate: `${f.windDirection}deg` }}>north</span>
+                              <span className="text-[10px] font-bold">{getCardinalDirection(f.windDirection)}</span>
+                            </div>
+                          </td>
                           <td className="py-3 px-3 font-bold">{units.speed(f.windSpeed)}</td>
                           <td className="py-3 px-3 text-textMuted">{f.windGust.toFixed(0)}</td>
                           <td className="py-3 px-3">
