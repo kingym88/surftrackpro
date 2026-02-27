@@ -139,7 +139,7 @@ const AppInner: React.FC = () => {
   return (
     <AppProvider isGuest={isGuest} uid={user?.uid}>
       <ToastProvider>
-        <div className="max-w-md mx-auto min-h-screen relative overflow-hidden">
+        <div className="max-w-md mx-auto min-h-screen overflow-y-auto">
           {renderScreen()}
 
           {showNav && isGuest && (

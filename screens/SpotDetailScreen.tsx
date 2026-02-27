@@ -389,7 +389,7 @@ export const SpotDetailScreen: React.FC<SpotDetailScreenProps> = ({ onNavigate, 
   };
 
   return (
-    <div className="pb-24 bg-background min-h-screen relative selection:bg-primary/20">
+    <div className="pb-24 bg-background min-h-screen selection:bg-primary/20">
       {/* Header Navigation */}
       <header className="sticky top-0 z-50 bg-background/90 backdrop-blur-xl border-b border-border shadow-sm">
         
