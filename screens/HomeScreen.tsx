@@ -50,7 +50,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
       setLoadingInsight(true);
       const breakProfile = homeSpot.breakProfile;
 
-      getGeminiInsight(homeForecast, breakProfile, sessions, preferredWaveHeight || { min: 0.5, max: 3.0 })
+      getGeminiInsight(homeForecast, breakProfile, sessions, preferredWaveHeight || { min: 0.5, max: 3.0 }, { lat: homeSpot.latitude, lng: homeSpot.longitude })
         .then(setInsight)
         .catch(console.error)
         .finally(() => setLoadingInsight(false));

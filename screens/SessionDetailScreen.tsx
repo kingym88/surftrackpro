@@ -58,7 +58,8 @@ export const SessionDetailScreen: React.FC<SessionDetailScreenProps> = ({ sessio
              [nearestForecast], 
              breakProfile, 
              [session], 
-             preferredWaveHeight || { min: 0.5, max: 3.0 }
+             preferredWaveHeight || { min: 0.5, max: 3.0 },
+             spot?.coordinates
            );
            setAiAnalysis(result.summary);
         } catch (e) {

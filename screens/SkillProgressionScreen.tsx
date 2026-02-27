@@ -95,12 +95,13 @@ export const SkillProgressionScreen: React.FC<SkillProgressionScreenProps> = ({ 
          if (filteredSessions.length === 0 || !homeSpotId || !homeSpot || isGuest) return;
          setIsLoadingAnalysis(true);
          try {
-             const result = await getGeminiInsight(
-               forecasts[homeSpotId] || [], 
-               homeSpot.breakProfile || {} as any, 
-               filteredSessions, 
-               preferredWaveHeight || { min: 0.5, max: 3.0 }
-             );
+              const result = await getGeminiInsight(
+                forecasts[homeSpotId] || [], 
+                homeSpot.breakProfile || {} as any, 
+                filteredSessions, 
+                preferredWaveHeight || { min: 0.5, max: 3.0 },
+                { lat: homeSpot.latitude, lng: homeSpot.longitude }
+              );
              setAiAnalysis(result.summary);
          } catch(e) {
              console.log(e);

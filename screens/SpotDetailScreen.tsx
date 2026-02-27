@@ -103,7 +103,7 @@ export const SpotDetailScreen: React.FC<SpotDetailScreenProps> = ({ onNavigate, 
   useEffect(() => {
     if (activeTab === 'ANALYSIS' && localForecasts.length > 0 && spot && !isGuest) {
       setLoadingInsight(true);
-      getGeminiInsight(localForecasts, spot.breakProfile!, sessions, preferredWaveHeight || { min: 0.5, max: 3.0 })
+      getGeminiInsight(localForecasts, spot.breakProfile!, sessions, preferredWaveHeight || { min: 0.5, max: 3.0 }, spot.coordinates)
         .then(setInsight)
         .catch(console.error)
         .finally(() => setLoadingInsight(false));

@@ -99,7 +99,7 @@ export const SurfMatchScreen: React.FC = () => {
 
             try {
                 const highestMatchTier = localSpotRanks[0];
-                const genAI = await getGeminiInsight([highestMatchTier.forecast], highestMatchTier.spot.breakProfile, [], userPrefs);
+                const genAI = await getGeminiInsight([highestMatchTier.forecast], highestMatchTier.spot.breakProfile, [], userPrefs, highestMatchTier.spot.coordinates);
                 setPersonalInsight(genAI.summary);
             } catch (aiErr) {
                 console.warn('AI Parsing skipped for offline.', aiErr);

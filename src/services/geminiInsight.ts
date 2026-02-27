@@ -1,3 +1,4 @@
+import * as SunCalc from 'suncalc';
 import type { ForecastSnapshot, SpotBreakProfile, SessionLog, GeminiInsight } from '@/types';
 
 const GEMINI_API_URL =
@@ -9,24 +10,26 @@ export async function getGeminiInsight(
   profileOrContext?: SpotBreakProfile | any[],
   history?: SessionLog[],
   preferredWaveHeight?: { min: number; max: number },
+  coords?: { lat: number; lng: number },
 ): Promise<GeminiInsight> {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY ?? process.env.GEMINI_API_KEY;
   if (!apiKey || apiKey === 'PLACEHOLDER_GEMINI_API_KEY') {
     return getFallbackInsight();
   }
 
   let prompt = '';
-  
+
   if (Array.isArray(forecastOrMessages) && forecastOrMessages.length > 0 && typeof forecastOrMessages[0] === 'object' && 'role' in forecastOrMessages[0]) {
       // Handle alternative generic message format (used in Post-Session analysis)
       prompt = (forecastOrMessages as Array<{role: string, content: string}>).map(m => m.content).join('\n');
   } else {
       // Handle original forecast payload
       prompt = buildPrompt(
-         forecastOrMessages as ForecastSnapshot[], 
-         profileOrContext as SpotBreakProfile, 
-         history || [], 
-         preferredWaveHeight
+         forecastOrMessages as ForecastSnapshot[],
+         profileOrContext as SpotBreakProfile,
+         history || [],
+         preferredWaveHeight,
+         coords ?? { lat: 39.36, lng: -9.38 }, // fallback: Peniche, Portugal
       );
   }
 
@@ -66,11 +69,18 @@ function buildPrompt(
   forecast: ForecastSnapshot[],
   profile: SpotBreakProfile,
   history: SessionLog[],
-  preferredWaveHeight?: { min: number; max: number },
+  preferredWaveHeight: { min: number; max: number } | undefined,
+  coords: { lat: number; lng: number },
 ): string {
-  // Take only the next 7 days of data (168 hours max)
-  const forecastSummary = forecast
-    .slice(0, 56) // every 3 hours × 56 = 7 days
+  // Filter to daylight hours only using SunCalc, then take up to 56 snapshots
+  const daylightForecast = forecast.filter(f => {
+    const date = new Date(f.forecastHour);
+    const sun = SunCalc.getTimes(date, coords.lat, coords.lng);
+    return date >= sun.sunrise && date <= sun.sunset;
+  });
+
+  const forecastSummary = daylightForecast
+    .slice(0, 56) // up to 7 days of daylight hours
     .map(
       f =>
         `${f.forecastHour}: waves ${f.waveHeight.toFixed(1)}m @ ${f.wavePeriod.toFixed(0)}s period, wind ${f.windSpeed.toFixed(0)}km/h from ${f.windDirection}°, swell from ${f.swellDirection}°`,
@@ -104,7 +114,7 @@ SPOT PROFILE:
 SURFER PREFERENCE:
 ${wavePreference}
 
-7-DAY FORECAST DATA:
+7-DAY FORECAST DATA (daylight hours only):
 ${forecastSummary}
 
 RECENT SESSION HISTORY:
@@ -117,6 +127,7 @@ TASK: Analyse the forecast data and identify the best 1–3 session windows in t
 4. Tide phase match
 5. Surfer's preferred wave height range
 6. Pattern comparison with past sessions
+7. Only recommend session windows during daylight hours (between sunrise and sunset). Do not suggest pre-dawn or post-sunset sessions.
 
 Respond ONLY with valid JSON in this exact format (no markdown, no extra text):
 {
