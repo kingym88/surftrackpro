@@ -139,7 +139,20 @@ const AppInner: React.FC = () => {
   return (
     <AppProvider isGuest={isGuest} uid={user?.uid}>
       <ToastProvider>
-        <div className="max-w-md mx-auto min-h-screen overflow-y-auto">
+        {/*
+          NOTE: No overflow or scroll property here — the browser window is the scroll root.
+          This is required for `position: sticky` on headers (e.g. SpotDetailScreen) to work.
+          Do NOT add overflow-hidden, overflow-auto, or overflow-scroll to this div;
+          any of those would create a new scroll context and silently break sticky headers.
+
+          Screens audited for scroll/height dependencies (none rely on this div as scroll root):
+          - LogSessionScreen: uses h-screen only on its empty-state guard div — safe.
+          - SessionDetailScreen: uses h-screen only on its empty-state guard div — safe.
+          - SpotDetailScreen: uses h-screen only on its no-spot guard div — safe.
+          - SignUpScreen: self-manages scroll with its own overflow-y-auto — safe.
+          - All other screens: min-h-screen only, scroll naturally via the window — safe.
+        */}
+        <div className="max-w-md mx-auto min-h-screen">
           {renderScreen()}
 
           {showNav && isGuest && (
