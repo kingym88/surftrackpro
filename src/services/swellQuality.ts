@@ -29,47 +29,51 @@ function compassToDeg(c: string): number {
   return map[c.toUpperCase()] ?? 0;
 }
 
-export function getBestTideWindow(
-  tidePoints: TidePoint[],
-  optimalPhase: 'low' | 'mid' | 'high' | 'any',
-  sunrise: Date,
-  sunset: Date,
+export function getBestSurfWindow(
+  snapshots: ForecastSnapshot[],
+  breakProfile: SpotBreakProfile,
+  coords: { lat: number; lng: number },
+  tidePoints: TidePoint[] | undefined,
+  date: Date
 ): string {
-  const extremes = tidePoints.filter(t => t.type === 'HIGH' || t.type === 'LOW');
-  const daylightExtremes = extremes.filter(t => {
-    const date = new Date(t.time);
-    return date >= sunrise && date <= sunset;
+  const sunTimes = SunCalc.getTimes(date, coords.lat, coords.lng);
+  const daylightSnapshots = snapshots.filter(f => {
+    const t = new Date(f.forecastHour);
+    return t >= sunTimes.sunrise && t <= sunTimes.sunset;
   });
 
-  if (optimalPhase === 'any') {
-    return "All-day tide";
-  }
+  if (daylightSnapshots.length < 2) return "Limited daylight data";
 
-  if (optimalPhase === 'low' || optimalPhase === 'high') {
-    const targetExtremes = daylightExtremes.filter(t => t.type?.toLowerCase() === optimalPhase);
-    if (targetExtremes.length === 0) return "No optimal tide window today";
-    
-    const solarNoon = new Date((sunrise.getTime() + sunset.getTime()) / 2).getTime();
-    const best = targetExtremes.reduce((prev, curr) => {
-      return Math.abs(new Date(curr.time).getTime() - solarNoon) < Math.abs(new Date(prev.time).getTime() - solarNoon) ? curr : prev;
-    });
-    return `Best around ${new Date(best.time).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit'})} (${optimalPhase} tide)`;
-  }
+  const scored = daylightSnapshots.map(f => ({
+    snapshot: f,
+    scoreObj: computeSwellQuality(f, breakProfile, coords, { skipDaylightCheck: true }, tidePoints)
+  }));
 
-  if (optimalPhase === 'mid') {
-    for (let i = 0; i < extremes.length - 1; i++) {
-       const t1 = new Date(extremes[i].time);
-       const t2 = new Date(extremes[i+1].time);
-       if ((t1 >= sunrise && t1 <= sunset) || (t2 >= sunrise && t2 <= sunset) || (t1 < sunrise && t2 > sunset)) {
-           const falling = extremes[i].type === 'HIGH';
-           const startTime = t1.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit'});
-           const endTime = t2.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit'});
-           return `${startTime}–${endTime} (mid tide ${falling ? 'falling' : 'rising'})`;
-       }
+  let maxAvg = -1;
+  let bestSubset: typeof scored = [];
+
+  for (const size of [3, 2]) {
+    if (scored.length < size) continue;
+    for (let i = 0; i <= scored.length - size; i++) {
+      const subset = scored.slice(i, i + size);
+      const avg = subset.reduce((sum, item) => sum + item.scoreObj.score, 0) / size;
+      if (avg > maxAvg) {
+        maxAvg = avg;
+        bestSubset = subset;
+      }
     }
   }
-  
-  return "No optimal tide window today";
+
+  if (maxAvg < 30) return "No good window today";
+
+  const startTime = new Date(bestSubset[0].snapshot.forecastHour).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  const lastTime = new Date(bestSubset[bestSubset.length - 1].snapshot.forecastHour);
+  lastTime.setHours(lastTime.getHours() + 1);
+  const endTime = lastTime.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+
+  const bestLabel = bestSubset.reduce((max, cur) => cur.scoreObj.score > max.scoreObj.score ? cur : max).scoreObj.label;
+
+  return `Best window: ${startTime}–${endTime} (${bestLabel} conditions)`;
 }
 
 // ─── Main scoring function ────────────────────────────────────────────────────

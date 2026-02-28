@@ -9,7 +9,7 @@ import { TideMiniChart } from '@/src/components/TideMiniChart';
 import { getPrecomputedForecast } from '@/src/services/firestore';
 import { fetchOpenMeteoForecast } from '@/src/services/openMeteo';
 import { useUnits } from '@/src/hooks/useUnits';
-import { computeSwellQuality, getBestTideWindow } from '@/src/services/swellQuality';
+import { computeSwellQuality, getBestSurfWindow } from '@/src/services/swellQuality';
 import { getGeminiInsight } from '@/src/services/geminiInsight';
 import { fetchTidePredictions } from '@/src/services/tides';
 import {
@@ -114,47 +114,56 @@ export const SpotDetailScreen: React.FC<SpotDetailScreenProps> = ({ onNavigate, 
   const currentCondition = useMemo(() => {
     if (!localForecasts.length || !spot?.breakProfile) return null;
     
+    let targetDate: Date;
+    let scoreObj: SwellQualityScore;
+    let daySnaps: typeof localForecasts;
+
     if (selectedDay === 'NOW') {
-      return computeSwellQuality(localForecasts[0], spot.breakProfile, spot.coordinates, undefined, tides[spot.id]);
+      targetDate = new Date();
+      const nowTime = targetDate.getTime();
+      const closestSnapshot = localForecasts.reduce((prev, curr) => 
+        Math.abs(new Date(curr.forecastHour).getTime() - nowTime) < Math.abs(new Date(prev.forecastHour).getTime() - nowTime) ? curr : prev
+      );
+      scoreObj = computeSwellQuality(closestSnapshot, spot.breakProfile, spot.coordinates, { skipDaylightCheck: true }, tides[spot.id]);
+      
+      const todayStr = targetDate.toISOString().slice(0, 10);
+      daySnaps = localForecasts.filter(f => f.forecastHour.startsWith(todayStr));
+    } else {
+      targetDate = new Date(`${selectedDay}T12:00:00Z`);
+      daySnaps = localForecasts.filter(f => 
+        new Date(f.forecastHour).toISOString().slice(0, 10) === selectedDay
+      );
+      
+      if (!daySnaps.length) return null;
+      
+      const sunTimes = SunCalc.getTimes(targetDate, spot.coordinates.lat, spot.coordinates.lng);
+      
+      const daylightSnapshots = daySnaps.filter(f => {
+        const t = new Date(f.forecastHour);
+        return t >= sunTimes.sunrise && t <= sunTimes.sunset;
+      });
+      
+      const candidateSnapshots = daylightSnapshots.length > 0 ? daylightSnapshots : daySnaps;
+      
+      const scored = candidateSnapshots.map(f => ({
+        snapshot: f,
+        scoreObj: computeSwellQuality(f, spot.breakProfile, spot.coordinates, { skipDaylightCheck: true }, tides[spot.id])
+      }));
+      
+      const best = scored.reduce((max, current) => 
+        current.scoreObj.score > max.scoreObj.score ? current : max
+      );
+      scoreObj = best.scoreObj;
     }
     
-    const daySnapshots = localForecasts.filter(f => 
-      new Date(f.forecastHour).toISOString().slice(0, 10) === selectedDay
-    );
-    
-    if (!daySnapshots.length) return null;
-    
-    // Filter to daylight hours for this specific day and spot
-    const sunDate = new Date(`${selectedDay}T12:00:00Z`);
-    const sunTimes = SunCalc.getTimes(sunDate, spot.coordinates.lat, spot.coordinates.lng);
-    
-    const daylightSnapshots = daySnapshots.filter(f => {
-      const t = new Date(f.forecastHour);
-      return t >= sunTimes.sunrise && t <= sunTimes.sunset;
-    });
-    
-    const candidateSnapshots = daylightSnapshots.length > 0 ? daylightSnapshots : daySnapshots;
-    
-    // Evaluate each candidate to find the best window
-    const scored = candidateSnapshots.map(f => ({
-      snapshot: f,
-      scoreObj: computeSwellQuality(f, spot.breakProfile, spot.coordinates, { skipDaylightCheck: true }, tides[spot.id])
-    }));
-    
-    const best = scored.reduce((max, current) => 
-      current.scoreObj.score > max.scoreObj.score ? current : max
-    );
-    
-    // Replace standard point-in-time tide feedback with daily optimal tide window description
-    const tideReasonIdx = best.scoreObj.reasons.findIndex(r => r.startsWith('Tide '));
-    if (tideReasonIdx >= 0) {
-      if (tides[spot.id] && tides[spot.id].length > 0) {
-         const newTideMsg = getBestTideWindow(tides[spot.id], spot.breakProfile.optimalTidePhase, sunTimes.sunrise, sunTimes.sunset);
-         best.scoreObj.reasons[tideReasonIdx] = newTideMsg;
-      }
+    const windowStr = getBestSurfWindow(daySnaps, spot.breakProfile, spot.coordinates, tides[spot.id], targetDate);
+    if (scoreObj.reasons.length >= 5) {
+      scoreObj.reasons[4] = windowStr;
+    } else {
+      scoreObj.reasons.push(windowStr);
     }
     
-    return best.scoreObj;
+    return scoreObj;
   }, [localForecasts, selectedDay, spot?.breakProfile, tides, spot?.id]);
 
   const chartData = useMemo(() => {
