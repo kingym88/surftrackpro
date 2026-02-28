@@ -156,11 +156,17 @@ export const SpotDetailScreen: React.FC<SpotDetailScreenProps> = ({ onNavigate, 
       scoreObj = best.scoreObj;
     }
     
-    const windowStr = getBestSurfWindow(daySnaps, spot.breakProfile, spot.coordinates, tides[spot.id], targetDate);
+    const windowRes = getBestSurfWindow(daySnaps, spot.breakProfile, spot.coordinates, tides[spot.id], targetDate);
+    
+    if (selectedDay !== 'NOW') {
+       scoreObj.score = windowRes.score;
+       scoreObj.label = windowRes.ratingLabel as SwellQualityScore['label'];
+    }
+
     if (scoreObj.reasons.length >= 5) {
-      scoreObj.reasons[4] = windowStr;
+      scoreObj.reasons[4] = windowRes.label;
     } else {
-      scoreObj.reasons.push(windowStr);
+      scoreObj.reasons.push(windowRes.label);
     }
     
     return scoreObj;

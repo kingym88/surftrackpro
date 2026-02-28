@@ -4,9 +4,10 @@ import type { ForecastSnapshot, SpotBreakProfile, SwellQualityScore, TidePoint }
 // ─── Scoring weights ──────────────────────────────────────────────────────────
 const WEIGHTS = {
   waveHeight: 25,
-  swellPeriod: 25,
+  swellPeriod: 20,
+  swellDirection: 15,
   windDirection: 20,
-  swellDirection: 20,
+  windSpeed: 10,
   tidePhase: 10,
 };
 
@@ -35,14 +36,14 @@ export function getBestSurfWindow(
   coords: { lat: number; lng: number },
   tidePoints: TidePoint[] | undefined,
   date: Date
-): string {
+): { label: string; score: number; ratingLabel: string } {
   const sunTimes = SunCalc.getTimes(date, coords.lat, coords.lng);
   const daylightSnapshots = snapshots.filter(f => {
     const t = new Date(f.forecastHour);
     return t >= sunTimes.sunrise && t <= sunTimes.sunset;
   });
 
-  if (daylightSnapshots.length < 2) return "Limited daylight data";
+  if (daylightSnapshots.length < 2) return { label: 'Limited daylight data', score: 0, ratingLabel: 'POOR' };
 
   const scored = daylightSnapshots.map(f => ({
     snapshot: f,
@@ -64,16 +65,18 @@ export function getBestSurfWindow(
     }
   }
 
-  if (maxAvg < 30) return "No good window today";
+  if (maxAvg < 30) return { label: 'No good window today', score: 0, ratingLabel: 'POOR' };
 
   const startTime = new Date(bestSubset[0].snapshot.forecastHour).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
   const lastTime = new Date(bestSubset[bestSubset.length - 1].snapshot.forecastHour);
   lastTime.setHours(lastTime.getHours() + 1);
   const endTime = lastTime.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 
-  const bestLabel = bestSubset.reduce((max, cur) => cur.scoreObj.score > max.scoreObj.score ? cur : max).scoreObj.label;
+  const ratingLabel = maxAvg >= 80 ? 'EPIC' :
+                      maxAvg >= 55 ? 'GOOD' :
+                      maxAvg >= 35 ? 'FAIR' : 'POOR';
 
-  return `Best window: ${startTime}–${endTime} (${bestLabel} conditions)`;
+  return { label: `Best window: ${startTime}–${endTime}`, score: maxAvg, ratingLabel };
 }
 
 // ─── Main scoring function ────────────────────────────────────────────────────
@@ -158,7 +161,7 @@ export function computeSwellQuality(
 
   if (windDiff <= 45) {
     windScore = WEIGHTS.windDirection;
-    reasons.push(`Offshore ${degToCompass(forecast.windDirection)} wind at ${forecast.windSpeed.toFixed(0)} km/h — perfect conditions.`);
+    reasons.push(`Offshore ${degToCompass(forecast.windDirection)} wind — perfect conditions.`);
   } else if (windDiff <= 90) {
     windScore = WEIGHTS.windDirection * 0.5;
     reasons.push(`Cross-shore wind — acceptable but not ideal.`);
@@ -167,9 +170,36 @@ export function computeSwellQuality(
     reasons.push(`Mostly onshore wind — expect messy, choppy conditions.`);
   } else {
     windScore = 0;
-    reasons.push(`Strong onshore ${degToCompass(forecast.windDirection)} wind — conditions blown out.`);
+    reasons.push(`Onshore ${degToCompass(forecast.windDirection)} wind — conditions blown out.`);
   }
   totalScore += windScore;
+
+  // ── 3b. Wind Speed ──────────────────────────────────────────────────────────
+  const ws = forecast.windSpeed; // km/h
+  let windSpeedScore: number;
+  let windSpeedLabel: string;
+  if (ws <= 5) {
+    windSpeedScore = WEIGHTS.windSpeed;
+    windSpeedLabel = 'Glassy';
+    reasons.push(`Glassy conditions (${ws.toFixed(0)} km/h) — perfect.`);
+  } else if (ws <= 15) {
+    windSpeedScore = WEIGHTS.windSpeed * 0.8;
+    windSpeedLabel = 'Light';
+    reasons.push(`Light wind (${ws.toFixed(0)} km/h) — very manageable.`);
+  } else if (ws <= 25) {
+    windSpeedScore = WEIGHTS.windSpeed * 0.5;
+    windSpeedLabel = 'Moderate';
+    reasons.push(`Moderate wind (${ws.toFixed(0)} km/h) — noticeable texture.`);
+  } else if (ws <= 40) {
+    windSpeedScore = WEIGHTS.windSpeed * 0.2;
+    windSpeedLabel = 'Strong';
+    reasons.push(`Strong wind (${ws.toFixed(0)} km/h) — degraded conditions.`);
+  } else {
+    windSpeedScore = 0;
+    windSpeedLabel = 'Storm';
+    reasons.push(`Storm force (${ws.toFixed(0)} km/h) — blown out.`);
+  }
+  totalScore += windSpeedScore;
 
   // ── 4. Swell Direction Alignment ───────────────────────────────────────────
   const optSwellParts = safeProfile.optimalSwellDirection.split('-');
