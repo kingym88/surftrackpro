@@ -1,5 +1,5 @@
 import * as SunCalc from 'suncalc';
-import type { ForecastSnapshot, SpotBreakProfile, SwellQualityScore } from '@/types';
+import type { ForecastSnapshot, SpotBreakProfile, SwellQualityScore, TidePoint } from '@/types';
 
 // ─── Scoring weights ──────────────────────────────────────────────────────────
 const WEIGHTS = {
@@ -29,12 +29,56 @@ function compassToDeg(c: string): number {
   return map[c.toUpperCase()] ?? 0;
 }
 
+export function getBestTideWindow(
+  tidePoints: TidePoint[],
+  optimalPhase: 'low' | 'mid' | 'high' | 'any',
+  sunrise: Date,
+  sunset: Date,
+): string {
+  const extremes = tidePoints.filter(t => t.type === 'HIGH' || t.type === 'LOW');
+  const daylightExtremes = extremes.filter(t => {
+    const date = new Date(t.time);
+    return date >= sunrise && date <= sunset;
+  });
+
+  if (optimalPhase === 'any') {
+    return "All-day tide";
+  }
+
+  if (optimalPhase === 'low' || optimalPhase === 'high') {
+    const targetExtremes = daylightExtremes.filter(t => t.type?.toLowerCase() === optimalPhase);
+    if (targetExtremes.length === 0) return "No optimal tide window today";
+    
+    const solarNoon = new Date((sunrise.getTime() + sunset.getTime()) / 2).getTime();
+    const best = targetExtremes.reduce((prev, curr) => {
+      return Math.abs(new Date(curr.time).getTime() - solarNoon) < Math.abs(new Date(prev.time).getTime() - solarNoon) ? curr : prev;
+    });
+    return `Best around ${new Date(best.time).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit'})} (${optimalPhase} tide)`;
+  }
+
+  if (optimalPhase === 'mid') {
+    for (let i = 0; i < extremes.length - 1; i++) {
+       const t1 = new Date(extremes[i].time);
+       const t2 = new Date(extremes[i+1].time);
+       if ((t1 >= sunrise && t1 <= sunset) || (t2 >= sunrise && t2 <= sunset) || (t1 < sunrise && t2 > sunset)) {
+           const falling = extremes[i].type === 'HIGH';
+           const startTime = t1.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit'});
+           const endTime = t2.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit'});
+           return `${startTime}–${endTime} (mid tide ${falling ? 'falling' : 'rising'})`;
+       }
+    }
+  }
+  
+  return "No optimal tide window today";
+}
+
 // ─── Main scoring function ────────────────────────────────────────────────────
 export function computeSwellQuality(
   forecast: ForecastSnapshot,
   profile: SpotBreakProfile | undefined,
   coords: { lat: number; lng: number },
   options?: { skipDaylightCheck?: boolean },
+  tidePoints?: TidePoint[]
 ): SwellQualityScore {
   // ── Daylight gate — score 0 outside sunrise/sunset ─────────────────────────
   // Pass options.skipDaylightCheck = true when the caller has already filtered
@@ -145,17 +189,58 @@ export function computeSwellQuality(
   totalScore += swellDirScore;
 
   // ── 5. Tide Phase ───────────────────────────────────────────────────────────
-  // TODO: replace with real tide data — use tides[] array keyed by spot when available.
-  // Using 'mid' as a neutral fallback so tide phase never incorrectly penalises scoring.
-  const currentTidePhase: 'low' | 'mid' | 'high' = 'mid';
+  let currentTidePhase: 'low' | 'mid' | 'high' = 'mid';
+  let tideDirection = '';
+  
+  if (tidePoints && tidePoints.length > 0) {
+    const forecastTime = new Date(forecast.forecastHour).getTime();
+    const extremes = tidePoints.filter(t => t.type === 'HIGH' || t.type === 'LOW');
+    
+    let before: TidePoint | null = null;
+    let after: TidePoint | null = null;
+    
+    for (let i = 0; i < extremes.length - 1; i++) {
+        const t1 = new Date(extremes[i].time).getTime();
+        const t2 = new Date(extremes[i+1].time).getTime();
+        if (forecastTime >= t1 && forecastTime <= t2) {
+            before = extremes[i];
+            after = extremes[i+1];
+            break;
+        }
+    }
+    
+    if (before && after) {
+        if (before.type === 'HIGH' && after.type === 'LOW') {
+            tideDirection = 'falling';
+        } else if (before.type === 'LOW' && after.type === 'HIGH') {
+            tideDirection = 'rising';
+        }
+        
+        const timeToBefore = Math.abs(forecastTime - new Date(before.time).getTime());
+        const timeToAfter = Math.abs(forecastTime - new Date(after.time).getTime());
+        
+        const minDistance = Math.min(timeToBefore, timeToAfter);
+        const nearestExtreme = timeToBefore < timeToAfter ? before : after;
+        
+        if (minDistance <= 45 * 60 * 1000) {
+             currentTidePhase = nearestExtreme.type === 'HIGH' ? 'high' : 'low';
+        }
+    }
+  }
 
   let tideScore = 0;
   if (safeProfile.optimalTidePhase === 'any' || currentTidePhase === safeProfile.optimalTidePhase) {
     tideScore = WEIGHTS.tidePhase;
-    reasons.push(`Tide phase (${currentTidePhase}) matches optimal for this break.`);
+    const dirStr = currentTidePhase === 'mid' && tideDirection ? `, ${tideDirection}` : '';
+    if (safeProfile.optimalTidePhase === 'any') {
+        reasons.push(`Tide (${currentTidePhase}${dirStr}) — matches optimal.`);
+    } else {
+        reasons.push(`Tide (${currentTidePhase}${dirStr}) — matches optimal.`);
+    }
   } else {
     tideScore = WEIGHTS.tidePhase * 0.3;
-    reasons.push(`Tide phase (${currentTidePhase}) not ideal — optimal is ${safeProfile.optimalTidePhase}.`);
+    const dirStr = currentTidePhase === 'mid' && tideDirection ? `, ${tideDirection}` : '';
+    reasons.push(`Tide (${currentTidePhase}${dirStr}) — optimal is ${safeProfile.optimalTidePhase}.`);
   }
   totalScore += tideScore;
 

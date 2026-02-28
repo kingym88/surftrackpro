@@ -19,7 +19,7 @@ const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 export const SurfMatchScreen: React.FC = () => {
     const { user } = useAuth();
-    const { spots } = useApp();
+    const { spots, tides } = useApp();
     const units = useUnits();
 
     const [selectedDayIndex, setSelectedDayIndex] = useState(0);
@@ -82,7 +82,7 @@ export const SurfMatchScreen: React.FC = () => {
                     const candidates = daylightSlices.length > 0 ? daylightSlices : matchingDaySlices;
 
                     for (const snap of candidates) {
-                        const computedScore = computeSwellQuality(snap, s.breakProfile, s.coordinates, { skipDaylightCheck: true });
+                        const computedScore = computeSwellQuality(snap, s.breakProfile, s.coordinates, { skipDaylightCheck: true }, tides[s.id]);
                         if (!optimizedWindow || computedScore.score > optimizedWindow.score.score) {
                             optimizedWindow = { spot: s, forecast: snap, score: computedScore };
                         }

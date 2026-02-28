@@ -1,6 +1,6 @@
 import React from 'react';
 import * as SunCalc from 'suncalc';
-import type { ForecastSnapshot, SwellQualityScore } from '@/types';
+import type { ForecastSnapshot, SwellQualityScore, TidePoint } from '@/types';
 import { computeSwellQuality } from '@/src/services/swellQuality';
 import { GuestGate } from './GuestGate';
 import { useUnits } from '@/src/hooks/useUnits';
@@ -25,6 +25,7 @@ interface ForecastStripProps {
   forecasts: ForecastSnapshot[];
   spotId?: string;
   coords?: { lat: number; lng: number };
+  tidePoints?: TidePoint[];
   onDaySelect?: (date: string) => void;
   /** Guest users see only today/tomorrow */
   isGuest?: boolean;
@@ -57,6 +58,7 @@ export const ForecastStrip: React.FC<ForecastStripProps> = ({
   coords = { lat: 39.36, lng: -9.38 }, // Default: Peniche, Portugal
   onDaySelect,
   isGuest = false,
+  tidePoints,
   onNavigate,
 }) => {
   const units = useUnits();
@@ -90,7 +92,7 @@ export const ForecastStrip: React.FC<ForecastStripProps> = ({
 
     const scored = candidateSnapshots.map(f => ({
       snapshot: f,
-      scoreObj: computeSwellQuality(f, DEFAULT_BREAK_PROFILE, coords, { skipDaylightCheck: true })
+      scoreObj: computeSwellQuality(f, DEFAULT_BREAK_PROFILE, coords, { skipDaylightCheck: true }, tidePoints)
     }));
 
     const best = scored.reduce((max, current) => 

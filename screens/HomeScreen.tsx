@@ -113,7 +113,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
     return "Onshore";
   };
 
-  const qualityScore = currentSnap ? computeSwellQuality(currentSnap, (homeSpot as any)?.breakProfile || {} as any, { lat: homeSpot?.latitude ?? 0, lng: homeSpot?.longitude ?? 0 }) : null;
+  const qualityScore = currentSnap ? computeSwellQuality(currentSnap, (homeSpot as any)?.breakProfile || {} as any, { lat: homeSpot?.latitude ?? 0, lng: homeSpot?.longitude ?? 0 }, undefined, homeSpotId ? tides[homeSpotId] : undefined) : null;
 
   return (
     <div className="pb-24">
@@ -234,6 +234,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
         {homeSpotId && (
           <ForecastStrip
             forecasts={homeForecast ?? []}
+            spotId={homeSpotId || undefined}
+            coords={{ lat: homeSpot?.latitude ?? 0, lng: homeSpot?.longitude ?? 0 }}
+            tidePoints={homeSpotId ? tides[homeSpotId] : undefined}
             onDaySelect={(day) => { if (homeSpot) onNavigate(Screen.SPOT_DETAIL, { spot: toSurfSpot(homeSpot) }); }}
             isGuest={isGuest}
             onNavigate={onNavigate}
@@ -334,7 +337,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
             {nearbySpotIds.map(nid => {
               const ndata = PORTUGAL_SPOTS.find(s => s.id === nid);
               const ncast = forecasts[nid]?.[0];
-              const nscore = ncast ? computeSwellQuality(ncast, (ndata as any)?.breakProfile || {} as any, { lat: ndata?.latitude ?? 0, lng: ndata?.longitude ?? 0 }) : null;
+              const nscore = ncast ? computeSwellQuality(ncast, (ndata as any)?.breakProfile || {} as any, { lat: ndata?.latitude ?? 0, lng: ndata?.longitude ?? 0 }, undefined, tides[nid]) : null;
               
               if (!ndata) return null;
               
