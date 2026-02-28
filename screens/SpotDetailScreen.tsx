@@ -370,7 +370,7 @@ export const SpotDetailScreen: React.FC<SpotDetailScreenProps> = ({ onNavigate, 
                     {(selectedDay === 'NOW' ? localForecasts : localForecasts.filter(f => new Date(f.forecastHour).toISOString().slice(0, 10) === selectedDay)).map((f, i) => {
                       const time = new Date(f.forecastHour).toLocaleTimeString([], { hour: 'numeric' });
                       const isGuestBlur = isGuest && i > 24; 
-                      const qScore = computeSwellQuality(f, spot?.breakProfile || {} as any, spot?.coordinates || { lat: 0, lng: 0 }, undefined, spot?.id ? tides[spot.id] : undefined);
+                      const qScore = computeSwellQuality(f, spot?.breakProfile || {} as any, spot?.coordinates || { lat: 0, lng: 0 }, { skipDaylightCheck: true }, spot?.id ? tides[spot.id] : undefined);
                       
                       const RowContent = (
                         <tr key={i} className="hover:bg-background/50 transition-colors">
