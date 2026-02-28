@@ -113,7 +113,7 @@ export interface SpotBreakProfile {
   breakType: 'beach' | 'reef' | 'point';
   facingDirection: string;       // e.g. "NW"
   optimalSwellDirection: string; // e.g. "W-NW"
-  optimalTidePhase: 'low' | 'mid' | 'high' | 'any';
+  optimalTidePhase: 'low' | 'mid' | 'high' | 'any' | 'all' | 'low-mid' | 'mid-high' | 'falling' | 'rising';
   optimalWindDirection: string;  // e.g. "E-NE (offshore)"
 }
 

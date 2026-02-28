@@ -24,7 +24,7 @@ export const PORTUGAL_SPOTS: PortugalSpotSeed[] = [
     country: 'PT',
     latitude: 41.69,
     longitude: -8.84,
-    breakProfile: {breakType:'beach',facingDirection:'W',optimalSwellDirection:'W-NW',optimalTidePhase:'mid',optimalWindDirection:'E'},
+    breakProfile: {breakType:'beach',facingDirection:'W',optimalSwellDirection:'W-NW',optimalTidePhase:'low',optimalWindDirection:'E'},
   },
   {
     id: 'vila-praia-de-ancora',
@@ -42,7 +42,7 @@ export const PORTUGAL_SPOTS: PortugalSpotSeed[] = [
     country: 'PT',
     latitude: 41.77,
     longitude: -8.87,
-    breakProfile: {breakType:'beach',facingDirection:'W',optimalSwellDirection:'W-NW',optimalTidePhase:'mid',optimalWindDirection:'E'},
+    breakProfile: {breakType:'beach',facingDirection:'W',optimalSwellDirection:'W-NW',optimalTidePhase:'all',optimalWindDirection:'E'},
   },
   {
     id: 'moledo',
@@ -51,7 +51,7 @@ export const PORTUGAL_SPOTS: PortugalSpotSeed[] = [
     country: 'PT',
     latitude: 41.84,
     longitude: -8.87,
-    breakProfile: {breakType:'beach',facingDirection:'W',optimalSwellDirection:'W-NW',optimalTidePhase:'mid',optimalWindDirection:'E'},
+    breakProfile: {breakType:'beach',facingDirection:'W',optimalSwellDirection:'W-NW',optimalTidePhase:'low-mid',optimalWindDirection:'E'},
   },
   {
     id: 'sauve-mar',
@@ -177,7 +177,7 @@ export const PORTUGAL_SPOTS: PortugalSpotSeed[] = [
     country: 'PT',
     latitude: 41.17,
     longitude: -8.69,
-    breakProfile: {breakType:'beach',facingDirection:'W',optimalSwellDirection:'W-NW',optimalTidePhase:'any',optimalWindDirection:'E'},
+    breakProfile: {breakType:'beach',facingDirection:'W',optimalSwellDirection:'W-NW',optimalTidePhase:'all',optimalWindDirection:'E'},
   },
   {
     id: 'luz-porto',
@@ -222,7 +222,7 @@ export const PORTUGAL_SPOTS: PortugalSpotSeed[] = [
     country: 'PT',
     latitude: 41.01,
     longitude: -8.64,
-    breakProfile: {breakType:'beach',facingDirection:'W',optimalSwellDirection:'W-NW',optimalTidePhase:'mid',optimalWindDirection:'E'},
+    breakProfile: {breakType:'beach',facingDirection:'W',optimalSwellDirection:'W-NW',optimalTidePhase:'low-mid',optimalWindDirection:'E'},
   },
   {
     id: 'esmoriz',
@@ -267,7 +267,7 @@ export const PORTUGAL_SPOTS: PortugalSpotSeed[] = [
     country: 'PT',
     latitude: 40.14,
     longitude: -8.86,
-    breakProfile: {breakType:'beach',facingDirection:'W',optimalSwellDirection:'W-NW',optimalTidePhase:'mid',optimalWindDirection:'E'},
+    breakProfile: {breakType:'beach',facingDirection:'W',optimalSwellDirection:'W-NW',optimalTidePhase:'low-mid',optimalWindDirection:'E'},
   },
   {
     id: 'nazare',
@@ -276,7 +276,7 @@ export const PORTUGAL_SPOTS: PortugalSpotSeed[] = [
     country: 'PT',
     latitude: 39.6,
     longitude: -9.08,
-    breakProfile: {breakType:'beach',facingDirection:'W',optimalSwellDirection:'W-NW',optimalTidePhase:'mid',optimalWindDirection:'E'},
+    breakProfile: {breakType:'beach',facingDirection:'W',optimalSwellDirection:'W-NW',optimalTidePhase:'all',optimalWindDirection:'E'},
   },
   {
     id: 'sao-martinho-do-porto',
@@ -303,7 +303,7 @@ export const PORTUGAL_SPOTS: PortugalSpotSeed[] = [
     country: 'PT',
     latitude: 39.37,
     longitude: -9.33,
-    breakProfile: {breakType:'reef',facingDirection:'N',optimalSwellDirection:'N-NW',optimalTidePhase:'mid',optimalWindDirection:'S'},
+    breakProfile: {breakType:'reef',facingDirection:'N',optimalSwellDirection:'N-NW',optimalTidePhase:'low-mid',optimalWindDirection:'S'},
   },
   {
     id: 'vila-nova',
@@ -321,7 +321,7 @@ export const PORTUGAL_SPOTS: PortugalSpotSeed[] = [
     country: 'PT',
     latitude: 39.37,
     longitude: -9.33,
-    breakProfile: {breakType:'beach',facingDirection:'NW',optimalSwellDirection:'W',optimalTidePhase:'any',optimalWindDirection:'S'},
+    breakProfile: {breakType:'beach',facingDirection:'NW',optimalSwellDirection:'W',optimalTidePhase:'all',optimalWindDirection:'S'},
   },
   {
     id: 'supertubos',
@@ -330,7 +330,7 @@ export const PORTUGAL_SPOTS: PortugalSpotSeed[] = [
     country: 'PT',
     latitude: 39.34,
     longitude: -9.36,
-    breakProfile: {breakType:'beach',facingDirection:'S-SW',optimalSwellDirection:'W-NW',optimalTidePhase:'mid',optimalWindDirection:'NE'},
+    breakProfile: {breakType:'beach',facingDirection:'S-SW',optimalSwellDirection:'W-NW',optimalTidePhase:'low-mid',optimalWindDirection:'NE'},
   },
   {
     id: 'ribeira-dilhas',
@@ -339,7 +339,7 @@ export const PORTUGAL_SPOTS: PortugalSpotSeed[] = [
     country: 'PT',
     latitude: 38.98,
     longitude: -9.42,
-    breakProfile: {breakType:'point',facingDirection:'W',optimalSwellDirection:'W-NW',optimalTidePhase:'mid',optimalWindDirection:'E'},
+    breakProfile: {breakType:'point',facingDirection:'W',optimalSwellDirection:'W-NW',optimalTidePhase:'all',optimalWindDirection:'E'},
   },
   {
     id: 'matadouro',
@@ -348,7 +348,7 @@ export const PORTUGAL_SPOTS: PortugalSpotSeed[] = [
     country: 'PT',
     latitude: 38.97,
     longitude: -9.42,
-    breakProfile: {breakType:'beach',facingDirection:'W',optimalSwellDirection:'W-NW',optimalTidePhase:'mid',optimalWindDirection:'E'},
+    breakProfile: {breakType:'beach',facingDirection:'W',optimalSwellDirection:'W-NW',optimalTidePhase:'all',optimalWindDirection:'E'},
   },
   {
     id: 'coxos',
@@ -357,7 +357,7 @@ export const PORTUGAL_SPOTS: PortugalSpotSeed[] = [
     country: 'PT',
     latitude: 38.99,
     longitude: -9.42,
-    breakProfile: {breakType:'point',facingDirection:'W',optimalSwellDirection:'W-NW',optimalTidePhase:'low',optimalWindDirection:'E'},
+    breakProfile: {breakType:'point',facingDirection:'W',optimalSwellDirection:'W-NW',optimalTidePhase:'low-mid',optimalWindDirection:'E'},
   },
   {
     id: 'reef',
@@ -375,7 +375,7 @@ export const PORTUGAL_SPOTS: PortugalSpotSeed[] = [
     country: 'PT',
     latitude: 39,
     longitude: -9.42,
-    breakProfile: {breakType:'point',facingDirection:'W',optimalSwellDirection:'W-NW',optimalTidePhase:'low',optimalWindDirection:'E'},
+    breakProfile: {breakType:'point',facingDirection:'W',optimalSwellDirection:'W-NW',optimalTidePhase:'mid',optimalWindDirection:'E'},
   },
   {
     id: 'foz-de-lizandro',
@@ -384,7 +384,7 @@ export const PORTUGAL_SPOTS: PortugalSpotSeed[] = [
     country: 'PT',
     latitude: 38.93,
     longitude: -9.42,
-    breakProfile: {breakType:'beach',facingDirection:'W',optimalSwellDirection:'W-NW',optimalTidePhase:'mid',optimalWindDirection:'E'},
+    breakProfile: {breakType:'beach',facingDirection:'W',optimalSwellDirection:'W-NW',optimalTidePhase:'low-mid',optimalWindDirection:'E'},
   },
   {
     id: 'praia-das-macas',
@@ -483,7 +483,7 @@ export const PORTUGAL_SPOTS: PortugalSpotSeed[] = [
     country: 'PT',
     latitude: 38.68,
     longitude: -9.34,
-    breakProfile: {breakType:'beach',facingDirection:'S',optimalSwellDirection:'SW',optimalTidePhase:'mid',optimalWindDirection:'N'},
+    breakProfile: {breakType:'beach',facingDirection:'S',optimalSwellDirection:'SW',optimalTidePhase:'all',optimalWindDirection:'N'},
   },
   {
     id: 'parede',
@@ -519,7 +519,7 @@ export const PORTUGAL_SPOTS: PortugalSpotSeed[] = [
     country: 'PT',
     latitude: 38.73,
     longitude: -9.47,
-    breakProfile: {breakType:'beach',facingDirection:'W',optimalSwellDirection:'W',optimalTidePhase:'any',optimalWindDirection:'E'},
+    breakProfile: {breakType:'beach',facingDirection:'W',optimalSwellDirection:'W',optimalTidePhase:'all',optimalWindDirection:'E'},
   },
   {
     id: 'praia-da-areia-branca',
@@ -573,7 +573,7 @@ export const PORTUGAL_SPOTS: PortugalSpotSeed[] = [
     country: 'PT',
     latitude: 38.64,
     longitude: -9.24,
-    breakProfile: {breakType:'beach',facingDirection:'W',optimalSwellDirection:'W-NW',optimalTidePhase:'any',optimalWindDirection:'E'},
+    breakProfile: {breakType:'beach',facingDirection:'W',optimalSwellDirection:'W-NW',optimalTidePhase:'all',optimalWindDirection:'E'},
   },
   {
     id: 'praia-da-saude',
@@ -654,7 +654,7 @@ export const PORTUGAL_SPOTS: PortugalSpotSeed[] = [
     country: 'PT',
     latitude: 38.48,
     longitude: -9.17,
-    breakProfile: {breakType:'beach',facingDirection:'SW',optimalSwellDirection:'W-NW',optimalTidePhase:'mid',optimalWindDirection:'N'},
+    breakProfile: {breakType:'beach',facingDirection:'SW',optimalSwellDirection:'W-NW',optimalTidePhase:'mid-high',optimalWindDirection:'N'},
   },
   {
     id: 'sines',
@@ -735,7 +735,7 @@ export const PORTUGAL_SPOTS: PortugalSpotSeed[] = [
     country: 'PT',
     latitude: 37.52,
     longitude: -8.79,
-    breakProfile: {breakType:'beach',facingDirection:'W',optimalSwellDirection:'W-NW',optimalTidePhase:'mid',optimalWindDirection:'E'},
+    breakProfile: {breakType:'beach',facingDirection:'W',optimalSwellDirection:'W-NW',optimalTidePhase:'falling',optimalWindDirection:'E'},
   },
   {
     id: 'praia-das-furnas',
@@ -762,7 +762,7 @@ export const PORTUGAL_SPOTS: PortugalSpotSeed[] = [
     country: 'PT',
     latitude: 37.44,
     longitude: -8.8,
-    breakProfile: {breakType:'beach',facingDirection:'NW',optimalSwellDirection:'W-NW',optimalTidePhase:'mid',optimalWindDirection:'SE'},
+    breakProfile: {breakType:'beach',facingDirection:'NW',optimalSwellDirection:'W-NW',optimalTidePhase:'falling',optimalWindDirection:'SE'},
   },
   {
     id: 'amoreira',
@@ -771,7 +771,7 @@ export const PORTUGAL_SPOTS: PortugalSpotSeed[] = [
     country: 'PT',
     latitude: 37.36,
     longitude: -8.84,
-    breakProfile: {breakType:'beach',facingDirection:'NW',optimalSwellDirection:'W-NW',optimalTidePhase:'mid',optimalWindDirection:'SE'},
+    breakProfile: {breakType:'beach',facingDirection:'NW',optimalSwellDirection:'W-NW',optimalTidePhase:'low-mid',optimalWindDirection:'SE'},
   },
   {
     id: 'carriagem',
@@ -780,7 +780,7 @@ export const PORTUGAL_SPOTS: PortugalSpotSeed[] = [
     country: 'PT',
     latitude: 37.34,
     longitude: -8.85,
-    breakProfile: {breakType:'beach',facingDirection:'W',optimalSwellDirection:'W-NW',optimalTidePhase:'mid',optimalWindDirection:'E'},
+    breakProfile: {breakType:'beach',facingDirection:'W',optimalSwellDirection:'W-NW',optimalTidePhase:'all',optimalWindDirection:'E'},
   },
   {
     id: 'vale-figueiras',
@@ -798,7 +798,7 @@ export const PORTUGAL_SPOTS: PortugalSpotSeed[] = [
     country: 'PT',
     latitude: 37.29,
     longitude: -8.87,
-    breakProfile: {breakType:'beach',facingDirection:'W',optimalSwellDirection:'W',optimalTidePhase:'mid',optimalWindDirection:'E'},
+    breakProfile: {breakType:'beach',facingDirection:'W',optimalSwellDirection:'W',optimalTidePhase:'all',optimalWindDirection:'E'},
   },
   {
     id: 'monte-clerigo',
@@ -807,7 +807,7 @@ export const PORTUGAL_SPOTS: PortugalSpotSeed[] = [
     country: 'PT',
     latitude: 37.31,
     longitude: -8.86,
-    breakProfile: {breakType:'beach',facingDirection:'NW',optimalSwellDirection:'W-NW',optimalTidePhase:'mid',optimalWindDirection:'SE'},
+    breakProfile: {breakType:'beach',facingDirection:'NW',optimalSwellDirection:'W-NW',optimalTidePhase:'low-mid',optimalWindDirection:'SE'},
   },
   {
     id: 'praia-dos-mouranitos',
@@ -843,7 +843,7 @@ export const PORTUGAL_SPOTS: PortugalSpotSeed[] = [
     country: 'PT',
     latitude: 37.06,
     longitude: -8.96,
-    breakProfile: {breakType:'point',facingDirection:'W',optimalSwellDirection:'W',optimalTidePhase:'low',optimalWindDirection:'E'},
+    breakProfile: {breakType:'point',facingDirection:'W',optimalSwellDirection:'W',optimalTidePhase:'all',optimalWindDirection:'E'},
   },
   {
     id: 'praia-castelejo',
@@ -852,7 +852,7 @@ export const PORTUGAL_SPOTS: PortugalSpotSeed[] = [
     country: 'PT',
     latitude: 37.1,
     longitude: -8.94,
-    breakProfile: {breakType:'beach',facingDirection:'W',optimalSwellDirection:'W-NW',optimalTidePhase:'mid',optimalWindDirection:'E'},
+    breakProfile: {breakType:'beach',facingDirection:'W',optimalSwellDirection:'W-NW',optimalTidePhase:'mid-high',optimalWindDirection:'E'},
   },
   {
     id: 'praia-da-cordoama',
@@ -861,7 +861,7 @@ export const PORTUGAL_SPOTS: PortugalSpotSeed[] = [
     country: 'PT',
     latitude: 37.11,
     longitude: -8.93,
-    breakProfile: {breakType:'beach',facingDirection:'W',optimalSwellDirection:'W-NW',optimalTidePhase:'mid',optimalWindDirection:'E'},
+    breakProfile: {breakType:'beach',facingDirection:'W',optimalSwellDirection:'W-NW',optimalTidePhase:'mid-high',optimalWindDirection:'E'},
   },
   {
     id: 'carrapateira',
@@ -870,7 +870,7 @@ export const PORTUGAL_SPOTS: PortugalSpotSeed[] = [
     country: 'PT',
     latitude: 37.18,
     longitude: -8.9,
-    breakProfile: {breakType:'beach',facingDirection:'W',optimalSwellDirection:'W-NW',optimalTidePhase:'mid',optimalWindDirection:'E'},
+    breakProfile: {breakType:'beach',facingDirection:'W',optimalSwellDirection:'W-NW',optimalTidePhase:'low-mid',optimalWindDirection:'E'},
   },
   {
     id: 'praia-do-amado',
@@ -879,7 +879,7 @@ export const PORTUGAL_SPOTS: PortugalSpotSeed[] = [
     country: 'PT',
     latitude: 37.16,
     longitude: -8.9,
-    breakProfile: {breakType:'beach',facingDirection:'W',optimalSwellDirection:'W-NW',optimalTidePhase:'mid',optimalWindDirection:'E'},
+    breakProfile: {breakType:'beach',facingDirection:'W',optimalSwellDirection:'W-NW',optimalTidePhase:'low-mid',optimalWindDirection:'E'},
   },
   {
     id: 'tonel',
@@ -888,7 +888,7 @@ export const PORTUGAL_SPOTS: PortugalSpotSeed[] = [
     country: 'PT',
     latitude: 37,
     longitude: -8.94,
-    breakProfile: {breakType:'beach',facingDirection:'W',optimalSwellDirection:'W',optimalTidePhase:'mid',optimalWindDirection:'E'},
+    breakProfile: {breakType:'beach',facingDirection:'W',optimalSwellDirection:'W',optimalTidePhase:'all',optimalWindDirection:'E'},
   },
   {
     id: 'beliche',
@@ -897,7 +897,7 @@ export const PORTUGAL_SPOTS: PortugalSpotSeed[] = [
     country: 'PT',
     latitude: 37.02,
     longitude: -8.96,
-    breakProfile: {breakType:'beach',facingDirection:'S',optimalSwellDirection:'SW',optimalTidePhase:'low',optimalWindDirection:'N'},
+    breakProfile: {breakType:'beach',facingDirection:'S',optimalSwellDirection:'SW',optimalTidePhase:'low-mid',optimalWindDirection:'N'},
   },
   {
     id: 'mareta',
@@ -906,7 +906,7 @@ export const PORTUGAL_SPOTS: PortugalSpotSeed[] = [
     country: 'PT',
     latitude: 37,
     longitude: -8.93,
-    breakProfile: {breakType:'beach',facingDirection:'S',optimalSwellDirection:'S',optimalTidePhase:'mid',optimalWindDirection:'N'},
+    breakProfile: {breakType:'beach',facingDirection:'S',optimalSwellDirection:'S',optimalTidePhase:'all',optimalWindDirection:'N'},
   },
 ];
 
