@@ -265,16 +265,8 @@ export function computeSwellQuality(
   let tideScore = 0;
   if (safeProfile.optimalTidePhase === 'any' || currentTidePhase === safeProfile.optimalTidePhase) {
     tideScore = WEIGHTS.tidePhase;
-    const dirStr = currentTidePhase === 'mid' && tideDirection ? `, ${tideDirection}` : '';
-    if (safeProfile.optimalTidePhase === 'any') {
-        reasons.push(`Tide (${currentTidePhase}${dirStr}) — matches optimal.`);
-    } else {
-        reasons.push(`Tide (${currentTidePhase}${dirStr}) — matches optimal.`);
-    }
   } else {
     tideScore = WEIGHTS.tidePhase * 0.3;
-    const dirStr = currentTidePhase === 'mid' && tideDirection ? `, ${tideDirection}` : '';
-    reasons.push(`Tide (${currentTidePhase}${dirStr}) — optimal is ${safeProfile.optimalTidePhase}.`);
   }
   totalScore += tideScore;
 
