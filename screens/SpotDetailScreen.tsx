@@ -379,7 +379,7 @@ export const SpotDetailScreen: React.FC<SpotDetailScreenProps> = ({ onNavigate, 
                           <td className="py-3 px-3 text-textMuted">{f.wavePeriod.toFixed(0)}s</td>
                           <td className="py-3 px-3">
                             <div className="flex flex-col items-center gap-0.5">
-                              <span className="material-icons-round text-sm" style={{ rotate: `${f.swellDirection}deg` }}>north</span>
+                              <span className="material-icons-round text-sm" style={{ rotate: `${(f.swellDirection + 180) % 360}deg` }}>north</span>
                               <span className="text-[10px] text-textMuted font-bold">{getCardinalDirection(f.swellDirection)}</span>
                             </div>
                           </td>
