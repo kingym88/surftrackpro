@@ -362,7 +362,7 @@ export const SpotDetailScreen: React.FC<SpotDetailScreenProps> = ({ onNavigate, 
                           </td>
                           <td className="py-3 px-3 font-bold">
                             <div className="flex flex-col items-center gap-0.5">
-                              <span className="material-icons-round text-sm" style={{ rotate: `${f.windDirection}deg` }}>north</span>
+                              <span className="material-icons-round text-sm" style={{ rotate: `${(f.windDirection + 180) % 360}deg` }}>north</span>
                               <span className="text-[10px] font-bold">{getCardinalDirection(f.windDirection)}</span>
                             </div>
                           </td>

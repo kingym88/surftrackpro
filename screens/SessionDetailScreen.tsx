@@ -137,7 +137,7 @@ export const SessionDetailScreen: React.FC<SessionDetailScreenProps> = ({ sessio
                  <div className="bg-background rounded-xl p-3 border border-border">
                     <p className="text-[10px] font-bold text-slate-500 uppercase mb-1">Wind & Swell Dir</p>
                     <div className="flex flex-col gap-1">
-                       <span className="text-sm font-black text-text">{units.speed(nearestForecast.windSpeed)} <span className="material-icons-round text-[10px]" style={{rotate: `${nearestForecast.windDirection}deg`}}>north</span></span>
+                       <span className="text-sm font-black text-text">{units.speed(nearestForecast.windSpeed)} <span className="material-icons-round text-[10px]" style={{rotate: `${(nearestForecast.windDirection + 180) % 360}deg`}}>north</span></span>
                        <span className="text-[10px] font-bold text-textMuted">Swell {nearestForecast.swellDirection}°</span>
                     </div>
                  </div>

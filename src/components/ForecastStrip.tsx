@@ -42,7 +42,7 @@ function getLabelColour(label: SwellQualityScore['label']): string {
 
 function getWindIcon(windDir: number): string {
   const dirs = ['north', 'north_east', 'east', 'south_east', 'south', 'south_west', 'west', 'north_west'];
-  return dirs[Math.round((windDir % 360) / 45) % 8];
+  return dirs[Math.round(((windDir + 180) % 360) / 45) % 8];
 }
 
 function formatDay(isoString: string, index: number): string {

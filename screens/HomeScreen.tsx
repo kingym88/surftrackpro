@@ -89,7 +89,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
 
   const getWindIcon = (dir: number) => {
     const dirs = ['north', 'north_east', 'east', 'south_east', 'south', 'south_west', 'west', 'north_west'];
-    return dirs[Math.round((dir % 360) / 45) % 8] || 'north';
+    return dirs[Math.round(((dir + 180) % 360) / 45) % 8] || 'north';
   };
 
   const computeWindLabel = (dir: number) => {
