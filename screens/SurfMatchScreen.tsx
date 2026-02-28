@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import * as SunCalc from 'suncalc';
 import { useAuth } from '@/src/context/AuthContext';
 import { useApp } from '@/src/context/AppContext';
 import { useUnits } from '@/src/hooks/useUnits';
@@ -72,11 +73,16 @@ export const SurfMatchScreen: React.FC = () => {
                     
                     let optimizedWindow: MatchResult | null = null;
                     
-                    for (const snap of matchingDaySlices) {
-                        const hr = new Date(snap.forecastHour).getUTCHours();
-                        if (hr < 6 || hr > 19) continue; // Daylight filter logic constraints
+                    const sunTimes = SunCalc.getTimes(new Date(`${activeDatePrefix}T12:00:00Z`), s.coordinates.lat, s.coordinates.lng);
+                    const daylightSlices = matchingDaySlices.filter(snap => {
+                        const t = new Date(snap.forecastHour);
+                        return t >= sunTimes.sunrise && t <= sunTimes.sunset;
+                    });
+                    
+                    const candidates = daylightSlices.length > 0 ? daylightSlices : matchingDaySlices;
 
-                        const computedScore = computeSwellQuality(snap, s.breakProfile, s.coordinates);
+                    for (const snap of candidates) {
+                        const computedScore = computeSwellQuality(snap, s.breakProfile, s.coordinates, { skipDaylightCheck: true });
                         if (!optimizedWindow || computedScore.score > optimizedWindow.score.score) {
                             optimizedWindow = { spot: s, forecast: snap, score: computedScore };
                         }

@@ -34,19 +34,24 @@ export function computeSwellQuality(
   forecast: ForecastSnapshot,
   profile: SpotBreakProfile | undefined,
   coords: { lat: number; lng: number },
+  options?: { skipDaylightCheck?: boolean },
 ): SwellQualityScore {
   // ── Daylight gate — score 0 outside sunrise/sunset ─────────────────────────
-  const forecastDate = new Date(forecast.forecastHour);
-  const sunTimes = SunCalc.getTimes(forecastDate, coords.lat, coords.lng);
-  if (forecastDate < sunTimes.sunrise || forecastDate > sunTimes.sunset) {
-    return {
-      spotId: '',
-      forecastHour: forecast.forecastHour,
-      score: 0,
-      label: 'POOR',
-      confidence: 'LOW',
-      reasons: ['Outside daylight hours'],
-    };
+  // Pass options.skipDaylightCheck = true when the caller has already filtered
+  // to daylight snapshots (e.g. daily summary pickers) to avoid double-gating.
+  if (!options?.skipDaylightCheck) {
+    const forecastDate = new Date(forecast.forecastHour);
+    const sunTimes = SunCalc.getTimes(forecastDate, coords.lat, coords.lng);
+    if (forecastDate < sunTimes.sunrise || forecastDate > sunTimes.sunset) {
+      return {
+        spotId: '',
+        forecastHour: forecast.forecastHour,
+        score: 0,
+        label: 'POOR',
+        confidence: 'LOW',
+        reasons: ['Outside daylight hours'],
+      };
+    }
   }
 
   const safeProfile = profile || { breakType: 'beach', facingDirection: 'W', optimalSwellDirection: 'W-NW', optimalTidePhase: 'mid', optimalWindDirection: 'E' };

@@ -1,4 +1,5 @@
 import React from 'react';
+import * as SunCalc from 'suncalc';
 import type { ForecastSnapshot, SwellQualityScore } from '@/types';
 import { computeSwellQuality } from '@/src/services/swellQuality';
 import { GuestGate } from './GuestGate';
@@ -77,13 +78,26 @@ export const ForecastStrip: React.FC<ForecastStripProps> = ({
   const days = Object.entries(byDay).slice(0, 7);
 
   const dayCards: DayCard[] = days.map(([date, snaps], i) => {
-    // Use the mid-morning snapshot (or first available) as the representative
-    const midMorning = snaps.find(s => {
-      const h = new Date(s.forecastHour).getUTCHours();
-      return h >= 8 && h <= 10;
-    }) ?? snaps[0];
+    const sunDate = new Date(`${date}T12:00:00Z`);
+    const sunTimes = SunCalc.getTimes(sunDate, coords.lat, coords.lng);
 
-    const score = computeSwellQuality(midMorning, DEFAULT_BREAK_PROFILE, coords);
+    const daylightSnapshots = snaps.filter(f => {
+      const t = new Date(f.forecastHour);
+      return t >= sunTimes.sunrise && t <= sunTimes.sunset;
+    });
+
+    const candidateSnapshots = daylightSnapshots.length > 0 ? daylightSnapshots : snaps;
+
+    const scored = candidateSnapshots.map(f => ({
+      snapshot: f,
+      scoreObj: computeSwellQuality(f, DEFAULT_BREAK_PROFILE, coords, { skipDaylightCheck: true })
+    }));
+
+    const best = scored.reduce((max, current) => 
+      current.scoreObj.score > max.scoreObj.score ? current : max
+    );
+
+    const score = best.scoreObj;
     score.spotId = 'strip';
 
     return {

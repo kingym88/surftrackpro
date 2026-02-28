@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import * as SunCalc from 'suncalc';
 import { Screen } from '../types';
 import type { SurfSpot, ForecastSnapshot, GeminiInsight, SwellQualityScore } from '../types';
 import { useApp } from '@/src/context/AppContext';
@@ -123,11 +124,28 @@ export const SpotDetailScreen: React.FC<SpotDetailScreenProps> = ({ onNavigate, 
     
     if (!daySnapshots.length) return null;
     
-    const peakSnapshot = daySnapshots.reduce((max, f) => 
-      f.waveHeight > max.waveHeight ? f : max
-    , daySnapshots[0]);
+    // Filter to daylight hours for this specific day and spot
+    const sunDate = new Date(`${selectedDay}T12:00:00Z`);
+    const sunTimes = SunCalc.getTimes(sunDate, spot.coordinates.lat, spot.coordinates.lng);
     
-    return computeSwellQuality(peakSnapshot, spot.breakProfile, spot.coordinates);
+    const daylightSnapshots = daySnapshots.filter(f => {
+      const t = new Date(f.forecastHour);
+      return t >= sunTimes.sunrise && t <= sunTimes.sunset;
+    });
+    
+    const candidateSnapshots = daylightSnapshots.length > 0 ? daylightSnapshots : daySnapshots;
+    
+    // Evaluate each candidate to find the best window
+    const scored = candidateSnapshots.map(f => ({
+      snapshot: f,
+      scoreObj: computeSwellQuality(f, spot.breakProfile, spot.coordinates, { skipDaylightCheck: true })
+    }));
+    
+    const best = scored.reduce((max, current) => 
+      current.scoreObj.score > max.scoreObj.score ? current : max
+    );
+    
+    return best.scoreObj;
   }, [localForecasts, selectedDay, spot?.breakProfile]);
 
   const chartData = useMemo(() => {
