@@ -114,7 +114,7 @@ export function computeSwellQuality(
   const h = forecast.waveHeight;
   let heightScore = 0;
   const optimalMin = safeProfile.breakType === 'reef' ? 1.0 : 0.8;
-  const optimalMax = safeProfile.breakType === 'reef' ? 4.0 : 2.5;
+  const optimalMax = safeProfile.breakType === 'reef' ? 4.0 : 1.8;
 
   if (h >= optimalMin && h <= optimalMax) {
     heightScore = WEIGHTS.waveHeight;
