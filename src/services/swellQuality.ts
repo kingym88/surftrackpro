@@ -1,5 +1,6 @@
 import * as SunCalc from 'suncalc';
 import type { ForecastSnapshot, SpotBreakProfile, SwellQualityScore, TidePoint } from '@/types';
+import { deriveTideState } from '@/src/services/tides';
 
 // ─── Scoring weights ──────────────────────────────────────────────────────────
 const WEIGHTS = {
@@ -28,6 +29,32 @@ function compassToDeg(c: string): number {
     S: 180, SSW: 202.5, SW: 225, WSW: 247.5, W: 270, WNW: 292.5, NW: 315, NNW: 337.5,
   };
   return map[c.toUpperCase()] ?? 0;
+}
+
+function tideMatchScore(
+  optimal: SpotBreakProfile['optimalTidePhase'],
+  phase: 'low' | 'mid' | 'high',
+  direction: 'rising' | 'falling' | null
+): number {
+  switch (optimal) {
+    case 'any':
+    case 'all':
+      return 1.0;
+    case 'low':
+      return phase === 'low' ? 1.0 : 0.3;
+    case 'mid':
+      return phase === 'mid' ? 1.0 : 0.3;
+    case 'high':
+      return phase === 'high' ? 1.0 : 0.3;
+    case 'low-mid':
+      return phase === 'low' || phase === 'mid' ? 1.0 : 0.3;
+    case 'mid-high':
+      return phase === 'mid' || phase === 'high' ? 1.0 : 0.3;
+    case 'falling':
+      return direction === 'falling' ? 1.0 : 0.3;
+    case 'rising':
+      return direction === 'rising' ? 1.0 : 0.3;
+  }
 }
 
 export function getBestSurfWindow(
@@ -224,51 +251,25 @@ export function computeSwellQuality(
 
   // ── 5. Tide Phase ───────────────────────────────────────────────────────────
   let currentTidePhase: 'low' | 'mid' | 'high' = 'mid';
-  let tideDirection = '';
+  let tideDirection: 'rising' | 'falling' | null = null;
   
   if (tidePoints && tidePoints.length > 0) {
-    const forecastTime = new Date(forecast.forecastHour).getTime();
-    const extremes = tidePoints.filter(t => t.type === 'HIGH' || t.type === 'LOW');
-    
-    let before: TidePoint | null = null;
-    let after: TidePoint | null = null;
-    
-    for (let i = 0; i < extremes.length - 1; i++) {
-        const t1 = new Date(extremes[i].time).getTime();
-        const t2 = new Date(extremes[i+1].time).getTime();
-        if (forecastTime >= t1 && forecastTime <= t2) {
-            before = extremes[i];
-            after = extremes[i+1];
-            break;
-        }
-    }
-    
-    if (before && after) {
-        if (before.type === 'HIGH' && after.type === 'LOW') {
-            tideDirection = 'falling';
-        } else if (before.type === 'LOW' && after.type === 'HIGH') {
-            tideDirection = 'rising';
-        }
-        
-        const timeToBefore = Math.abs(forecastTime - new Date(before.time).getTime());
-        const timeToAfter = Math.abs(forecastTime - new Date(after.time).getTime());
-        
-        const minDistance = Math.min(timeToBefore, timeToAfter);
-        const nearestExtreme = timeToBefore < timeToAfter ? before : after;
-        
-        if (minDistance <= 45 * 60 * 1000) {
-             currentTidePhase = nearestExtreme.type === 'HIGH' ? 'high' : 'low';
-        }
-    }
+    const forecastTimeMs = new Date(forecast.forecastHour).getTime();
+    const state = deriveTideState(forecastTimeMs, tidePoints);
+    currentTidePhase = state.phase;
+    tideDirection = state.direction;
   }
 
-  let tideScore = 0;
-  if (safeProfile.optimalTidePhase === 'any' || currentTidePhase === safeProfile.optimalTidePhase) {
-    tideScore = WEIGHTS.tidePhase;
-  } else {
-    tideScore = WEIGHTS.tidePhase * 0.3;
-  }
+  const tideMultiplier = tideMatchScore(safeProfile.optimalTidePhase, currentTidePhase, tideDirection);
+  const tideScore = WEIGHTS.tidePhase * tideMultiplier;
   totalScore += tideScore;
+  
+  const dirStr = tideDirection ? ` (${tideDirection})` : '';
+  if (tideMultiplier === 1.0) {
+    reasons.push(`Tide: ${currentTidePhase}${dirStr} — matches optimal window for this break.`);
+  } else {
+    reasons.push(`Tide: ${currentTidePhase}${dirStr} — outside optimal window.`);
+  }
 
   // ── Map to label ────────────────────────────────────────────────────────────
   const label: SwellQualityScore['label'] =

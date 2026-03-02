@@ -98,3 +98,42 @@ export function generateSyntheticTides(date: string): TidePoint[] {
   // Sort them sequentially so the chart reads time correctly 
   return pts.sort((a,b) => new Date(a.time).getTime() - new Date(b.time).getTime());
 }
+
+export function deriveTideState(
+  forecastTimeMs: number,
+  tidePoints: TidePoint[]
+): { phase: 'low' | 'mid' | 'high'; direction: 'rising' | 'falling' | null } {
+  const extremes = tidePoints.filter(t => t.type === 'HIGH' || t.type === 'LOW');
+  
+  let before: TidePoint | null = null;
+  let after: TidePoint | null = null;
+  
+  for (let i = 0; i < extremes.length - 1; i++) {
+    const t1 = new Date(extremes[i].time).getTime();
+    const t2 = new Date(extremes[i+1].time).getTime();
+    if (forecastTimeMs >= t1 && forecastTimeMs <= t2) {
+      before = extremes[i];
+      after = extremes[i+1];
+      break;
+    }
+  }
+
+  if (!before || !after) {
+    return { phase: 'mid', direction: null };
+  }
+
+  const direction = before.type === 'HIGH' ? 'falling' : 'rising';
+  
+  const timeToBefore = Math.abs(forecastTimeMs - new Date(before.time).getTime());
+  const timeToAfter = Math.abs(forecastTimeMs - new Date(after.time).getTime());
+  
+  const minDistance = Math.min(timeToBefore, timeToAfter);
+  const nearestExtreme = timeToBefore < timeToAfter ? before : after;
+  
+  let phase: 'low' | 'mid' | 'high' = 'mid';
+  if (minDistance <= 45 * 60 * 1000) {
+    phase = nearestExtreme.type === 'HIGH' ? 'high' : 'low';
+  }
+
+  return { phase, direction };
+}
