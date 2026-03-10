@@ -107,9 +107,10 @@ export const AddBoardScreen: React.FC<AddBoardScreenProps> = ({ onBack, onSave }
 
        <main className="px-6 mt-4 space-y-6">
          {/* Photo Upload */}
-         <div
+         <button
+           type="button"
            onClick={handlePickPhoto}
-           className="flex flex-col items-center justify-center py-8 border-2 border-dashed border-slate-700 rounded-2xl bg-background/50 hover:bg-background transition-colors cursor-pointer"
+           className="w-full flex flex-col items-center justify-center py-8 border-2 border-dashed border-slate-700 rounded-2xl bg-background/50 hover:bg-background transition-colors cursor-pointer"
          >
            {photoPreview ? (
              <img src={photoPreview} alt="Board preview" className="w-full h-40 object-cover rounded-xl" />
@@ -122,7 +123,7 @@ export const AddBoardScreen: React.FC<AddBoardScreenProps> = ({ onBack, onSave }
                <p className="text-xs text-slate-500 mt-1">Tap to choose from library</p>
              </>
            )}
-         </div>
+         </button>
 
          {/* Basic Info */}
          <div className="space-y-4">
