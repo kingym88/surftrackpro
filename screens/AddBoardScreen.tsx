@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useAuth } from '@/src/context/AuthContext';
 import { useApp } from '@/src/context/AppContext';
 import { addBoard as addBoardFirestore } from '@/src/services/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { storage } from '@/src/firebase';
 import type { Board } from '@/types';
 
 interface AddBoardScreenProps {
@@ -19,7 +21,16 @@ export const AddBoardScreen: React.FC<AddBoardScreenProps> = ({ onBack, onSave }
   const [lengthIn, setLengthIn] = useState('');
   const [volume, setVolume] = useState(28);
   const [boardType, setBoardType] = useState<Board['boardType']>('shortboard');
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPhotoFile(file);
+    setPhotoPreview(URL.createObjectURL(file));
+  };
 
   const handleSave = async () => {
     if (!brand || !model || !lengthFt) return;
@@ -29,8 +40,21 @@ export const AddBoardScreen: React.FC<AddBoardScreenProps> = ({ onBack, onSave }
     // Actually the interface says length: number; // feet
     const finalLength = parseFloat(lengthFt) + (parseFloat(lengthIn || '0') / 12);
 
+    const boardId = `board_${Date.now()}`;
+    
+    let photoURL: string | undefined;
+    if (photoFile && user?.uid) {
+      try {
+        const storageRef = ref(storage, `quiver/${user.uid}/${boardId}`);
+        await uploadBytes(storageRef, photoFile);
+        photoURL = await getDownloadURL(storageRef);
+      } catch (e) {
+        console.error('Photo upload failed', e);
+      }
+    }
+
     const newBoard: Board = {
-      id: `board_${Date.now()}`,
+      id: boardId,
       uid: user?.uid,
       brand,
       model,
@@ -39,6 +63,7 @@ export const AddBoardScreen: React.FC<AddBoardScreenProps> = ({ onBack, onSave }
       thickness: 2.5, // default
       volume,
       boardType,
+      ...(photoURL && { photoURL }),
     };
 
     if (user?.uid) {
@@ -66,13 +91,20 @@ export const AddBoardScreen: React.FC<AddBoardScreenProps> = ({ onBack, onSave }
 
        <main className="px-6 mt-4 space-y-6">
          {/* Photo Upload */}
-         <div className="flex flex-col items-center justify-center py-8 border-2 border-dashed border-slate-700 rounded-2xl bg-background/50 hover:bg-background transition-colors cursor-pointer">
-           <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-3">
-             <span className="material-icons-round text-primary text-2xl">add_a_photo</span>
-           </div>
-           <p className="text-sm font-bold text-textMuted">Upload Photo</p>
-           <p className="text-xs text-slate-500 mt-1">Support for JPG, PNG</p>
-         </div>
+         <label htmlFor="board-photo" className="flex flex-col items-center justify-center py-8 border-2 border-dashed border-slate-700 rounded-2xl bg-background/50 hover:bg-background transition-colors cursor-pointer relative overflow-hidden">
+           {photoPreview ? (
+             <img src={photoPreview} alt="Board preview" className="absolute inset-0 w-full h-full object-cover" />
+           ) : (
+             <>
+               <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-3">
+                 <span className="material-icons-round text-primary text-2xl">add_a_photo</span>
+               </div>
+               <p className="text-sm font-bold text-textMuted">Upload Photo</p>
+               <p className="text-xs text-slate-500 mt-1">Support for JPG, PNG</p>
+             </>
+           )}
+           <input id="board-photo" type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
+         </label>
 
          {/* Basic Info */}
          <div className="space-y-4">

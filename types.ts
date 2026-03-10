@@ -71,6 +71,7 @@ export interface Board {
   volume: number; // litres
   boardType: 'shortboard' | 'longboard' | 'fish' | 'funboard' | 'gun' | 'foilboard';
   photo?: string;
+  photoURL?: string;
   uid?: string;
 }
 
