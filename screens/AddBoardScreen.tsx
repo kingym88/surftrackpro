@@ -20,6 +20,8 @@ export const AddBoardScreen: React.FC<AddBoardScreenProps> = ({ onBack, onSave }
   const [model, setModel] = useState('');
   const [lengthFt, setLengthFt] = useState('');
   const [lengthIn, setLengthIn] = useState('');
+  const [width, setWidth] = useState('19.5');
+  const [thickness, setThickness] = useState('2.5');
   const [volume, setVolume] = useState(28);
   const [boardType, setBoardType] = useState<Board['boardType']>('shortboard');
   const [photoBlob, setPhotoBlob] = useState<Blob | null>(null);
@@ -49,12 +51,20 @@ export const AddBoardScreen: React.FC<AddBoardScreenProps> = ({ onBack, onSave }
   };
 
   const handleSave = async () => {
-    if (!brand || !model || !lengthFt) return;
+    console.log('handleSave called');
+    console.log('brand:', brand, 'model:', model, 'lengthFt:', lengthFt);
+    if (!brand || !model || !lengthFt) {
+      alert('Validation failed — brand: ' + brand + ', model: ' + model + ', lengthFt: ' + lengthFt);
+      return;
+    }
+    console.log('Validation passed');
     setIsSaving(true);
     
     // total length conceptually (or just keeping as feet but we need to adhere to Board interface: length in feet as number, e.g. 5.10)
     // Actually the interface says length: number; // feet
     const finalLength = parseFloat(lengthFt) + (parseFloat(lengthIn || '0') / 12);
+    const finalWidth = parseFloat(width) || 19.5;
+    const finalThickness = parseFloat(thickness) || 2.5;
 
     const boardId = `board_${Date.now()}`;
     
@@ -75,24 +85,26 @@ export const AddBoardScreen: React.FC<AddBoardScreenProps> = ({ onBack, onSave }
       brand,
       model,
       length: finalLength,
-      width: 19.5, // default
-      thickness: 2.5, // default
+      width: finalWidth,
+      thickness: finalThickness,
       volume,
       boardType,
       ...(photoURL && { photoURL }),
     };
 
-    if (user?.uid) {
-      try {
+    try {
+      if (user?.uid) {
         await addBoardFirestore(user.uid, newBoard);
-      } catch (e) {
-        console.error("Failed to save board to firestore", e);
       }
+      addBoard(newBoard);
+      alert('Save completed successfully');
+      onSave();
+    } catch (e) {
+      alert('Save error: ' + JSON.stringify(e));
+      console.error("Failed to save board", e);
+    } finally {
+      setIsSaving(false);
     }
-    
-    addBoard(newBoard);
-    setIsSaving(false);
-    onSave();
   };
 
   return (
@@ -157,6 +169,14 @@ export const AddBoardScreen: React.FC<AddBoardScreenProps> = ({ onBack, onSave }
                   <button onClick={() => setVolume(v => v + 0.5)} className="w-8 h-8 rounded-full bg-surface flex items-center justify-center hover:bg-slate-600 text-text">+</button>
                 </div>
               </div>
+           </div>
+           <div>
+             <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block mb-2">Width (in)</label>
+             <input type="number" step="0.1" value={width} onChange={e => setWidth(e.target.value)} placeholder="19.5" className="w-full bg-surface border-none rounded-xl p-4 text-text placeholder-slate-500 focus:ring-2 focus:ring-primary outline-none" />
+           </div>
+           <div>
+             <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block mb-2">Thickness (in)</label>
+             <input type="number" step="0.01" value={thickness} onChange={e => setThickness(e.target.value)} placeholder="2.5" className="w-full bg-surface border-none rounded-xl p-4 text-text placeholder-slate-500 focus:ring-2 focus:ring-primary outline-none" />
            </div>
          </div>
 
