@@ -5,6 +5,7 @@ import { addBoard as addBoardFirestore } from '@/src/services/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '@/src/firebase';
 import type { Board } from '@/types';
+import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 
 interface AddBoardScreenProps {
   onBack: () => void;
@@ -21,15 +22,30 @@ export const AddBoardScreen: React.FC<AddBoardScreenProps> = ({ onBack, onSave }
   const [lengthIn, setLengthIn] = useState('');
   const [volume, setVolume] = useState(28);
   const [boardType, setBoardType] = useState<Board['boardType']>('shortboard');
-  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoBlob, setPhotoBlob] = useState<Blob | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setPhotoFile(file);
-    setPhotoPreview(URL.createObjectURL(file));
+  const handlePickPhoto = async () => {
+    try {
+      const photo = await Camera.getPhoto({
+        quality: 80,
+        allowEditing: false,
+        resultType: CameraResultType.Uri,
+        source: CameraSource.Photos, // opens photo library, not camera
+      });
+
+      if (photo.webPath) {
+        setPhotoPreview(photo.webPath);
+        // Convert to blob for Firebase upload
+        const response = await fetch(photo.webPath);
+        const blob = await response.blob();
+        setPhotoBlob(blob);
+      }
+    } catch (e) {
+      // User cancelled — do nothing
+      console.log('Photo pick cancelled', e);
+    }
   };
 
   const handleSave = async () => {
@@ -43,10 +59,10 @@ export const AddBoardScreen: React.FC<AddBoardScreenProps> = ({ onBack, onSave }
     const boardId = `board_${Date.now()}`;
     
     let photoURL: string | undefined;
-    if (photoFile && user?.uid) {
+    if (photoBlob && user?.uid) {
       try {
         const storageRef = ref(storage, `quiver/${user.uid}/${boardId}`);
-        await uploadBytes(storageRef, photoFile);
+        await uploadBytes(storageRef, photoBlob);
         photoURL = await getDownloadURL(storageRef);
       } catch (e) {
         console.error('Photo upload failed', e);
@@ -91,20 +107,22 @@ export const AddBoardScreen: React.FC<AddBoardScreenProps> = ({ onBack, onSave }
 
        <main className="px-6 mt-4 space-y-6">
          {/* Photo Upload */}
-         <label htmlFor="board-photo" className="flex flex-col items-center justify-center py-8 border-2 border-dashed border-slate-700 rounded-2xl bg-background/50 hover:bg-background transition-colors cursor-pointer relative overflow-hidden">
+         <div
+           onClick={handlePickPhoto}
+           className="flex flex-col items-center justify-center py-8 border-2 border-dashed border-slate-700 rounded-2xl bg-background/50 hover:bg-background transition-colors cursor-pointer"
+         >
            {photoPreview ? (
-             <img src={photoPreview} alt="Board preview" className="absolute inset-0 w-full h-full object-cover" />
+             <img src={photoPreview} alt="Board preview" className="w-full h-40 object-cover rounded-xl" />
            ) : (
              <>
                <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-3">
                  <span className="material-icons-round text-primary text-2xl">add_a_photo</span>
                </div>
                <p className="text-sm font-bold text-textMuted">Upload Photo</p>
-               <p className="text-xs text-slate-500 mt-1">Support for JPG, PNG</p>
+               <p className="text-xs text-slate-500 mt-1">Tap to choose from library</p>
              </>
            )}
-           <input id="board-photo" type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
-         </label>
+         </div>
 
          {/* Basic Info */}
          <div className="space-y-4">
