@@ -15,6 +15,7 @@ export async function fetchOpenMeteoForecast(
     hourly: '',
     timezone: 'Europe/Lisbon',
     forecast_days: '7',
+    past_days: '7',
   };
 
   const atmParams = new URLSearchParams({
