@@ -7,7 +7,7 @@ import { Capacitor } from '@capacitor/core';
 import { Preferences } from '@capacitor/preferences';
 import { fetchOpenMeteoForecast } from '@/src/services/openMeteo';
 import { fetchTidePredictions } from '@/src/services/tides';
-import { getUserProfile } from '@/src/services/firestore';
+import { getUserProfile, getSessions, getQuiver } from '@/src/services/firestore';
 
 // ─── State shape ──────────────────────────────────────────────────────────────
 interface AppState {
@@ -197,6 +197,17 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, isGuest, uid
       
       let setFromCloud = false;
       if (!isGuest && uid) {
+        // Quick offline load for instant UI
+        try {
+          const { value: sess } = await Preferences.get({ key: 'user_sessions' });
+          if (sess) dispatch({ type: 'SET_SESSIONS', payload: JSON.parse(sess) });
+          const { value: quiv } = await Preferences.get({ key: 'user_quiver' });
+          if (quiv) dispatch({ type: 'SET_QUIVER', payload: JSON.parse(quiv) });
+        } catch (e) {
+          // ignore cache errors
+        }
+
+        // Fetch authoritative data from Firestore
         try {
           const profile = await getUserProfile(uid);
           if (profile?.homeSpotId) {
@@ -205,8 +216,16 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, isGuest, uid
             setFromCloud = true;
             await Preferences.set({ key: 'user_homeSpotId', value: profile.homeSpotId });
           }
+
+          const [dbSessions, dbQuiver] = await Promise.all([
+            getSessions(uid),
+            getQuiver(uid)
+          ]);
+          dispatch({ type: 'SET_SESSIONS', payload: dbSessions });
+          dispatch({ type: 'SET_QUIVER', payload: dbQuiver });
+
         } catch (e) {
-          console.error('Failed to load user profile for preferences', e);
+          console.error('Failed to load user profile or data for preferences', e);
         }
       }
 
