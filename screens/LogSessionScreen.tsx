@@ -2,19 +2,26 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Screen } from '../types';
 import type { SessionLog, SurfSpot, Board, ForecastSnapshot, TidePoint, ConditionsSnapshot } from '../types';
 
+const parseSafeTime = (dateStr: string): number => {
+  if (!dateStr) return 0;
+  if (dateStr.includes('Z') || dateStr.includes('+')) return new Date(dateStr).getTime();
+  const safeStr = dateStr.length === 16 ? `${dateStr}:00Z` : `${dateStr}Z`;
+  return new Date(safeStr).getTime();
+};
+
 const findClosestForecast = (forecasts: ForecastSnapshot[], isoDatetime: string): ForecastSnapshot | null => {
   if (!forecasts?.length) return null;
-  const targetTime = new Date(isoDatetime).getTime();
+  const targetTime = parseSafeTime(isoDatetime);
   return forecasts.reduce((prev, curr) => {
-    return Math.abs(new Date(curr.forecastHour).getTime() - targetTime) < Math.abs(new Date(prev.forecastHour).getTime() - targetTime) ? curr : prev;
+    return Math.abs(parseSafeTime(curr.forecastHour) - targetTime) < Math.abs(parseSafeTime(prev.forecastHour) - targetTime) ? curr : prev;
   });
 };
 
 const findClosestTide = (tides: TidePoint[], isoDatetime: string): TidePoint | null => {
   if (!tides?.length) return null;
-  const targetTime = new Date(isoDatetime).getTime();
+  const targetTime = parseSafeTime(isoDatetime);
   return tides.reduce((prev, curr) => {
-    return Math.abs(new Date(curr.time).getTime() - targetTime) < Math.abs(new Date(prev.time).getTime() - targetTime) ? curr : prev;
+    return Math.abs(parseSafeTime(curr.time) - targetTime) < Math.abs(parseSafeTime(prev.time) - targetTime) ? curr : prev;
   });
 };
 
@@ -37,22 +44,23 @@ const buildConditionsSnapshot = (forecast: ForecastSnapshot, tide: TidePoint | n
 
 const buildConditionsRange = (forecasts: ForecastSnapshot[], tides: TidePoint[], sessionStart: string, durationHours: number): ConditionsSnapshot[] => {
   if (!forecasts?.length) return [];
-  const startMs = new Date(sessionStart).getTime();
+  const startMs = parseSafeTime(sessionStart);
   const endMs = startMs + durationHours * 3600000;
   
   const inWindow = forecasts.filter(f => {
-    const fTime = new Date(f.forecastHour).getTime();
+    const fTime = parseSafeTime(f.forecastHour);
     return fTime >= startMs && fTime <= endMs;
   });
 
   if (inWindow.length === 0) {
+    // Math logic based around string ISO with Z attached
     const midpoint = new Date(startMs + (durationHours * 3600000) / 2).toISOString();
     const closest = findClosestForecast(forecasts, midpoint);
     if (!closest) return [];
     return [buildConditionsSnapshot(closest, findClosestTide(tides, closest.forecastHour) || findClosestTide(tides, midpoint), midpoint)];
   }
 
-  return inWindow.sort((a, b) => new Date(a.forecastHour).getTime() - new Date(b.forecastHour).getTime())
+  return inWindow.sort((a, b) => parseSafeTime(a.forecastHour) - parseSafeTime(b.forecastHour))
     .map(f => buildConditionsSnapshot(f, findClosestTide(tides, f.forecastHour), sessionStart));
 };
 
@@ -108,16 +116,16 @@ export const LogSessionScreen: React.FC<LogSessionScreenProps> = ({ onNavigate }
   const spotTides = tides[selectedSpotId] || [];
 
   const sessionEndDatetime = useMemo(() => {
-    return new Date(new Date(sessionDatetime).getTime() + durationHours * 3600000).toISOString();
+    return new Date(parseSafeTime(sessionDatetime) + durationHours * 3600000).toISOString();
   }, [sessionDatetime, durationHours]);
 
   const matchedForecast = useMemo(() => {
-    const midpointMs = new Date(sessionDatetime).getTime() + (durationHours * 3600000) / 2;
+    const midpointMs = parseSafeTime(sessionDatetime) + (durationHours * 3600000) / 2;
     return findClosestForecast(spotForecasts, new Date(midpointMs).toISOString());
   }, [spotForecasts, sessionDatetime, durationHours]);
 
   const matchedTide = useMemo(() => {
-    const midpointMs = new Date(sessionDatetime).getTime() + (durationHours * 3600000) / 2;
+    const midpointMs = parseSafeTime(sessionDatetime) + (durationHours * 3600000) / 2;
     return findClosestTide(spotTides, new Date(midpointMs).toISOString());
   }, [spotTides, sessionDatetime, durationHours]);
 
@@ -136,7 +144,7 @@ export const LogSessionScreen: React.FC<LogSessionScreenProps> = ({ onNavigate }
     if (!selectedSpot || !selectedBoardId) return;
 
     const startISO = new Date(sessionDatetime).toISOString();
-    const midpointISO = new Date(new Date(sessionDatetime).getTime() + (durationHours * 3600000) / 2).toISOString();
+    const midpointISO = new Date(parseSafeTime(sessionDatetime) + (durationHours * 3600000) / 2).toISOString();
 
     const newSession: SessionLog = {
       id: `session_${Date.now()}`,
@@ -144,7 +152,7 @@ export const LogSessionScreen: React.FC<LogSessionScreenProps> = ({ onNavigate }
       spotId: selectedSpot.id,
       spotName: selectedSpot.name,
       date: startISO,
-      timestamp: new Date(sessionDatetime).getTime(),
+      timestamp: parseSafeTime(sessionDatetime),
       duration: durationHours * 60,
       waveCount,
       topSpeed: parseFloat(topSpeed) || 0,
