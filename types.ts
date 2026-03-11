@@ -34,6 +34,27 @@ export interface SurfSpot {
   breakProfile?: SpotBreakProfile;
 }
 
+export interface ConditionsSnapshot {
+  timestamp: string;       // ISO datetime this snapshot was matched to
+  forecastHour: string;    // exact forecastHour string from ForecastSnapshot
+  // Wave
+  waveHeight: number;      // metres
+  wavePeriod: number;      // seconds
+  swellHeight: number;     // metres
+  swellDirection: number;  // degrees
+  // Wind
+  windSpeed: number;       // km/h
+  windDirection: number;   // degrees
+  windGust: number;        // km/h
+  // Tide
+  tide: number;            // metres
+  tideType: string;        // 'HIGH' | 'LOW' | 'MID'
+  // Atmosphere
+  airTemp: number;         // °C
+  cloudCover: number;      // %
+  pressure: number;        // hPa
+}
+
 export interface SessionLog {
   id: string;
   spotName: string;
@@ -51,13 +72,8 @@ export interface SessionLog {
   boardId?: string;
   uid?: string;
   timestamp: number;
-  conditionsSnapshot?: {
-    waveHeight: number;
-    wavePeriod: number;
-    windSpeed: number;
-    windDirection: number;
-    tide: number;
-  };
+  conditionsSnapshot?: ConditionsSnapshot;       // kept for backwards compat — snapshot at session midpoint
+  conditionsRange?: ConditionsSnapshot[];         // one entry per forecast hour covered by the session window
 }
 
 // ─── Board (for Quiver) ────────────────────────────────────────────────────────
