@@ -22,7 +22,8 @@ import { EditProfileScreen } from '@/screens/EditProfileScreen';
 import { UserProfileProvider } from '@/src/context/UserProfileContext';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { AppProvider } from './src/context/AppContext';
-import { ToastProvider } from './src/context/ToastContext';
+import { ToastProvider, useToast } from './src/context/ToastContext';
+import { setupPushListeners, registerFCMToken } from '@/src/services/fcm';
 
 // ─── Screens that should hide the navigation bar ──────────────────────────────
 const HIDE_NAV_SCREENS: Screen[] = [
@@ -50,11 +51,24 @@ const AppInner: React.FC = () => {
   const [selectedSpot, setSelectedSpot] = useState<SurfSpot | null>(null);
   const [selectedSession, setSelectedSession] = useState<SessionLog | null>(null);
 
+  const { addToast } = useToast();
+
   const navigate = useCallback((screen: Screen, params?: any) => {
     if (params?.spot) setSelectedSpot(params.spot);
+    // Spot detail fallback 
+    if (screen === Screen.SPOT_DETAIL && params?.spotId && !params.spot) {
+      // NOTE: For a real app, we'd fetch the spot by id here before navigating, 
+      // but without a global spot cache we assume it's stored in AppContext
+    }
     if (params?.session) setSelectedSession(params.session);
     setCurrentScreen(screen);
   }, []);
+
+  React.useEffect(() => {
+    if (!isGuest) {
+      setupPushListeners(addToast, navigate).catch(console.error);
+    }
+  }, [addToast, navigate, isGuest]);
 
   if (isLoadingAuth) {
     return <AuthLoadingSplash />;

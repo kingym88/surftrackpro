@@ -1,5 +1,6 @@
 import { Capacitor } from '@capacitor/core';
 import { PushNotifications, Token, ActionPerformed, PushNotificationSchema } from '@capacitor/push-notifications';
+import { Screen } from '@/types';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 
@@ -54,7 +55,10 @@ export async function registerFCMToken(uid: string, token: string): Promise<void
  * (Note: The actual ToastContext should be consumed where this is called,
  * or the addToast function should be passed in as a callback).
  */
-export async function setupPushListeners(addToast: (message: string, type?: 'success' | 'error' | 'info') => void): Promise<void> {
+export async function setupPushListeners(
+  addToast: (message: string, type?: 'success' | 'error' | 'info') => void,
+  onNavigate?: (screen: Screen, params?: any) => void
+): Promise<void> {
   try {
     if (!Capacitor.isNativePlatform()) {
       return;
@@ -76,6 +80,10 @@ export async function setupPushListeners(addToast: (message: string, type?: 'suc
 
     await PushNotifications.addListener('pushNotificationActionPerformed', (notification: ActionPerformed) => {
       console.log('Push action performed: ' + JSON.stringify(notification));
+      const data = notification.notification.data;
+      if (data?.screen && onNavigate) {
+        onNavigate(data.screen as Screen, { spotId: data.spotId });
+      }
     });
 
     // We must register for push notifications.
