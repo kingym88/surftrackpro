@@ -35,8 +35,18 @@ exports.callGemini = (0, https_1.onCall)({
     cors: ['https://surftrack-pro.web.app', 'http://localhost:5173'],
     secrets: [geminiApiKey],
 }, async (request) => {
-    if (!request.auth) {
+    var _a, _b, _c;
+    // Verify the Authorization header manually for fetch-based calls
+    const authHeader = (_c = (_b = (_a = request.rawRequest) === null || _a === void 0 ? void 0 : _a.headers) === null || _b === void 0 ? void 0 : _b.authorization) !== null && _c !== void 0 ? _c : '';
+    const idToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+    if (!idToken) {
         throw new https_1.HttpsError('unauthenticated', 'Must be signed in.');
+    }
+    try {
+        await admin.auth().verifyIdToken(idToken);
+    }
+    catch (_d) {
+        throw new https_1.HttpsError('unauthenticated', 'Invalid or expired token.');
     }
     const { type, payload } = request.data;
     if (!type || !payload) {

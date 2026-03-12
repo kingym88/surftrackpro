@@ -1,17 +1,24 @@
 import * as SunCalc from 'suncalc';
+import { getAuth } from 'firebase/auth';
+import { app } from '@/src/firebase';
 import type { ForecastSnapshot, SpotBreakProfile, SessionLog, GeminiInsight, ConditionsSnapshot, Board } from '@/types';
 
 const isDev = import.meta.env.DEV;
 
 async function callGemini(data: { type: string; payload: Record<string, any> }): Promise<string> {
-  const { getAuth } = await import('firebase/auth');
-  const { app } = await import('@/src/firebase');
   const auth = getAuth(app);
-  const user = auth.currentUser;
+
+  const user = await new Promise<ReturnType<typeof auth.currentUser>>((resolve) => {
+    const unsubscribe = auth.onAuthStateChanged((u) => {
+      unsubscribe();
+      resolve(u);
+    });
+  });
+
   if (!user) throw new Error('Not authenticated');
-  
-  const token = await user.getIdToken();
-  
+
+  const token = await user.getIdToken(true);
+
   const response = await fetch('/api/callGemini', {
     method: 'POST',
     headers: {
@@ -20,7 +27,7 @@ async function callGemini(data: { type: string; payload: Record<string, any> }):
     },
     body: JSON.stringify({ data }),
   });
-  
+
   if (!response.ok) throw new Error(`Function error: ${response.status}`);
   const json = await response.json();
   return json.result.text;

@@ -14,8 +14,18 @@ export const callGemini = onCall(
     secrets: [geminiApiKey],
   },
   async (request) => {
-    if (!request.auth) {
+    // Verify the Authorization header manually for fetch-based calls
+    const authHeader = request.rawRequest?.headers?.authorization ?? '';
+    const idToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+
+    if (!idToken) {
       throw new HttpsError('unauthenticated', 'Must be signed in.');
+    }
+
+    try {
+      await admin.auth().verifyIdToken(idToken);
+    } catch {
+      throw new HttpsError('unauthenticated', 'Invalid or expired token.');
     }
 
     const { type, payload } = request.data;
