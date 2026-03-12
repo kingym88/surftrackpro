@@ -274,3 +274,91 @@ function getFallbackInsight(): GeminiInsight {
       'AI Coach is unavailable right now — check back shortly. Based on patterns, early mornings this week should offer the best conditions.',
   };
 }
+
+export async function getSessionNoteDraft(
+  conditions: ConditionsSnapshot,
+  board: Board | undefined,
+  rating: number,
+  waveCount: number,
+  durationHours: number,
+  spotName: string,
+): Promise<string> {
+  const prompt = `You are helping a surfer write a quick session diary note.
+
+SESSION FACTS:
+- Spot: ${spotName}
+- Rating: ${rating}/5
+- Duration: ${durationHours} hours
+- Wave count: ${waveCount}
+- Conditions: ${conditions.waveHeight.toFixed(1)}m waves @ ${conditions.wavePeriod.toFixed(0)}s, wind ${conditions.windSpeed.toFixed(0)}km/h, tide ${conditions.tideType} (${conditions.tide.toFixed(1)}m)
+${board ? `- Board: ${board.brand} ${board.model} ${board.volume}L (${board.boardType})` : ''}
+
+Write a 2–3 sentence personal surf diary note in first person. 
+Sound like a real surfer — casual, honest, descriptive. 
+Reference the conditions and session stats. Do not start with "I had".
+Do not add quotes around the note.
+
+Respond ONLY with valid JSON: { "note": "your draft note here" }`;
+
+  try {
+    const functions = getFunctions();
+    const callGemini = httpsCallable<{ prompt: string; temperature: number; maxOutputTokens: number }, { text: string }>(functions, 'callGemini');
+    const result = await callGemini({ prompt, temperature: 0.8, maxOutputTokens: 256 });
+    const parsed = JSON.parse(result.data.text);
+    return parsed.note ?? '';
+  } catch {
+    return '';
+  }
+}
+
+export async function getSkillCoachAnalysis(
+  sessions: SessionLog[],
+  quiver: Board[],
+  homeSpotName: string,
+  timeframe: '30' | '90' | 'ALL',
+): Promise<string> {
+  if (sessions.length < 3) return '';
+
+  const recentSessions = sessions.slice(0, 10);
+  const sessionSummary = recentSessions.map(s => {
+    const board = quiver.find(b => b.id === s.boardId);
+    return `${s.date.slice(0, 10)}: ${s.spotName}, waves ~${s.height}m, ` +
+      `rated ${s.rating}/5, energy ${s.energyLevel ?? 'N/A'}/5, waves caught: ${s.waveCount ?? 'N/A'}` +
+      `${board ? `, board: ${board.brand} ${board.model} ${board.volume}L` : ''}` +
+      `${s.notes ? `, note: "${s.notes.slice(0, 60)}"` : ''}`;
+  }).join('\n');
+
+  const trend = (() => {
+    const ratings = recentSessions.map(s => s.rating);
+    const first = ratings.slice(-3).reduce((a,b) => a+b, 0) / 3;
+    const last = ratings.slice(0, 3).reduce((a,b) => a+b, 0) / 3;
+    if (last > first + 0.4) return 'improving';
+    if (last < first - 0.4) return 'declining';
+    return 'consistent';
+  })();
+
+  const prompt = `You are an expert surf coach reviewing a surfer's progression log.
+
+HOME BREAK: ${homeSpotName}
+TIMEFRAME: Last ${timeframe === 'ALL' ? 'all time' : timeframe + ' days'}
+RECENT SESSIONS (most recent first):
+${sessionSummary}
+
+COMPUTED TREND: ${trend}
+
+Give a 3–4 sentence coaching analysis. Be specific — reference actual session data (dates, wave heights, boards used). 
+Identify one clear strength and one actionable area to improve. End with a motivating but realistic next goal.
+Use plain surfer language — honest, direct, not patronising.
+
+Respond ONLY with valid JSON: { "analysis": "your coaching analysis here" }`;
+
+  try {
+    const functions = getFunctions();
+    const callGemini = httpsCallable<{ prompt: string; temperature: number; maxOutputTokens: number }, { text: string }>(functions, 'callGemini');
+    const result = await callGemini({ prompt, temperature: 0.7, maxOutputTokens: 512 });
+    const parsed = JSON.parse(result.data.text);
+    return parsed.analysis ?? '';
+  } catch {
+    return '';
+  }
+}

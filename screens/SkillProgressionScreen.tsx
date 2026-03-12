@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useApp } from '@/src/context/AppContext';
 import { useAuth } from '@/src/context/AuthContext';
-import { getGeminiInsight } from '@/src/services/geminiInsight';
+import { getSkillCoachAnalysis } from '@/src/services/geminiInsight';
 import { GuestGate } from '@/src/components/GuestGate';
 import { PORTUGAL_SPOTS } from '@/src/data/portugalSpots';
 import { useUnits } from '@/src/hooks/useUnits';
@@ -136,16 +136,14 @@ export const SkillProgressionScreen: React.FC<SkillProgressionScreenProps> = ({ 
       // Cache miss — call Gemini
       setIsLoadingAnalysis(true);
       try {
-        const result = await getGeminiInsight(
-          forecasts[homeSpotId] || [],
-          homeSpot.breakProfile || {} as any,
+        const result = await getSkillCoachAnalysis(
           filteredSessions,
-          preferredWaveHeight || { min: 0.5, max: 3.0 },
-          { lat: homeSpot.latitude, lng: homeSpot.longitude },
-          quiver
+          quiver,
+          homeSpot.name,
+          timeframe
         );
-        await setGeminiCache(user.uid, cacheKey, result.summary);
-        setAiAnalysis(result.summary);
+        await setGeminiCache(user.uid, cacheKey, result);
+        setAiAnalysis(result);
       } catch(e) {
         console.error('Gemini coaching failed:', e);
       } finally {
@@ -270,8 +268,8 @@ export const SkillProgressionScreen: React.FC<SkillProgressionScreenProps> = ({ 
                     <span className="material-icons-round">psychology</span>
                     </div>
                     <div>
-                    <h3 className="font-bold text-text">Coach's Analysis</h3>
-                    <p className="text-[10px] text-primary font-bold uppercase tracking-widest">Gemini Powered</p>
+                    <h3 className="font-bold text-text">Progression Coaching</h3>
+                    <p className="text-[10px] text-primary font-bold uppercase tracking-widest">AI Coach · Gemini</p>
                     </div>
                 </div>
                 

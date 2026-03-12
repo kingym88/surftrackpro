@@ -75,6 +75,7 @@ import { useToast } from '@/src/context/ToastContext';
 import { GuestGate } from '@/src/components/GuestGate';
 import { addSession as addSessionFirestore } from '@/src/services/firestore';
 import { useUnits } from '@/src/hooks/useUnits';
+import { getSessionNoteDraft } from '@/src/services/geminiInsight';
 
 interface LogSessionScreenProps {
   onNavigate: (screen: Screen, params?: any) => void;
@@ -98,6 +99,7 @@ export const LogSessionScreen: React.FC<LogSessionScreenProps> = ({ onNavigate }
   const [selectedBoardId, setSelectedBoardId] = useState<string>('');
   const [durationHours, setDurationHours] = useState(1.5);
   const [notes, setNotes] = useState('');
+  const [isDraftingNote, setIsDraftingNote] = useState(false);
   const [crowdFactor, setCrowdFactor] = useState(3);
   const [energyLevel, setEnergyLevel] = useState(3);
   
@@ -506,7 +508,31 @@ export const LogSessionScreen: React.FC<LogSessionScreenProps> = ({ onNavigate }
 
              {/* Personal Notes */}
              <section className="mb-8">
-               <h2 className="text-[10px] font-bold uppercase tracking-widest text-textMuted mb-4">Personal Notes</h2>
+               <div className="flex justify-between items-center mb-4">
+                 <h2 className="text-[10px] font-bold uppercase tracking-widest text-textMuted">Personal Notes</h2>
+                 <button
+                   onClick={async () => {
+                     if (!matchedForecast || isDraftingNote) return;
+                     setIsDraftingNote(true);
+                     const board = quiver.find(b => b.id === selectedBoardId);
+                     const snapshot = matchedForecast ? buildConditionsSnapshot(matchedForecast, matchedTide, sessionDatetime) : null;
+                     if (snapshot) {
+                       const draft = await getSessionNoteDraft(snapshot, board, rating, waveCount, durationHours, selectedSpot?.name ?? '');
+                       if (draft) setNotes(draft);
+                       addToast('Draft generated — feel free to edit ✏️', 'success');
+                     }
+                     setIsDraftingNote(false);
+                   }}
+                   disabled={!matchedForecast || isDraftingNote || !selectedBoardId}
+                   className="flex items-center gap-2 text-xs font-bold text-primary border border-primary/30 px-3 py-1.5 rounded-full hover:bg-primary/10 transition-colors disabled:opacity-40"
+                 >
+                   {isDraftingNote
+                     ? <span className="material-icons-round animate-spin text-sm">sync</span>
+                     : <span className="material-icons-round text-sm">auto_awesome</span>
+                   }
+                   {isDraftingNote ? 'Drafting...' : 'Draft with AI ✨'}
+                 </button>
+               </div>
                <textarea 
                  value={notes}
                  onChange={(e) => setNotes(e.target.value)}
