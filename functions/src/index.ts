@@ -107,20 +107,20 @@ SPOT PROFILE:
 SURFER PREFERENCE:
 ${p.wavePreference ?? 'No specific wave height preference set.'}
 
-7-DAY FORECAST DATA (daylight hours only):
+7-DAY FORECAST DATA (daylight hours only, future dates only):
 ${p.forecastSummary}
 
 RECENT SESSION HISTORY:
 ${p.historyText ?? 'No previous sessions logged.'}
 ${p.boardsUsedText ?? ''}${p.detectedPatternsText ?? ''}
 
-TASK: Analyse the forecast data and identify the best 1–3 session windows in the next 7 days. Consider wave height and period quality, wind direction (offshore is best), swell direction alignment, tide phase match, surfer's preferred wave height range, and pattern comparison with past sessions. Only recommend daylight hours. Factor in energy levels and crowd data from past sessions. Consider board choices.
+TASK: Analyse the forecast data and identify the best 1–3 session windows. Consider wave height and period quality, wind direction (offshore is best), swell direction alignment, tide phase match, surfer's preferred wave height range, and pattern comparison with past sessions. Only recommend daylight hours. Only recommend future dates — never recommend dates in the past.
 
-Respond ONLY with valid JSON in this exact format (no markdown, no extra text):
+You MUST respond with ONLY a raw JSON object. No markdown. No code fences. No backticks. No explanation. Just the JSON object starting with { and ending with }:
+
 {
   "bestWindows": [
-    {"startTime": "ISO8601_datetime", "endTime": "ISO8601_datetime", "reason": "2-3 sentence explanation in plain surfer language"},
-    ...
+    {"startTime": "ISO8601_datetime", "endTime": "ISO8601_datetime", "reason": "2-3 sentence explanation in plain surfer language"}
   ],
   "summary": "2-3 sentence overall forecast summary for this spot this week, in plain surfer language"
 }`;
@@ -128,7 +128,7 @@ Respond ONLY with valid JSON in this exact format (no markdown, no extra text):
 
 function buildSurfMatchPrompt(p: any): string {
   return `You are an elite virtual surf coach analysing a spot's 7-day forecast.
-  
+
 SPOT PROFILE:
 - Optimal Swell: ${p.optimalSwellDirection}
 - Optimal Wind: ${p.optimalWindDirection}
@@ -141,11 +141,11 @@ TASK:
 Provide exactly one short, punchy sentence (max 15 words) per day giving a qualitative coaching opinion on that day's specific condition.
 Speak naturally like a surfer. Do not include the date or introductory phrases.
 
-Respond ONLY with a valid JSON Record<string, string> where the key is the YYYY-MM-DD date and the value is the sentence.
+Respond ONLY with a valid JSON Record where the key is the YYYY-MM-DD date and the value is the sentence.
 Example format:
-{
-  "2026-03-01": "Punchy and offshore all morning, grab the shorty.",
-  "2026-03-02": "Blowing heavy onshore, might be blown out."
+
+"2026-03-01": "Punchy and offshore all morning, grab the shorty.",
+"2026-03-02": "Blowing heavy onshore, might be blown out."
 }`;
 }
 
@@ -160,8 +160,8 @@ SESSION FACTS:
 - Conditions: ${p.waveHeight}m waves @ ${p.wavePeriod}s, wind ${p.windSpeed}km/h, tide ${p.tideType} (${p.tide}m)
 ${p.board ? `- Board: ${p.board}` : ''}
 
-Write a 2–3 sentence personal surf diary note in first person. 
-Sound like a real surfer — casual, honest, descriptive. 
+Write a 2–3 sentence personal surf diary note in first person.
+Sound like a real surfer — casual, honest, descriptive.
 Reference the conditions and session stats. Do not start with "I had".
 Do not add quotes around the note.
 
@@ -178,7 +178,7 @@ ${p.sessionSummary}
 
 COMPUTED TREND: ${p.trend}
 
-Give a 3–4 sentence coaching analysis. Be specific — reference actual session data (dates, wave heights, boards used). 
+Give a 3–4 sentence coaching analysis. Be specific — reference actual session data (dates, wave heights, boards used).
 Identify one clear strength and one actionable area to improve. End with a motivating but realistic next goal.
 Use plain surfer language — honest, direct, not patronising.
 
@@ -186,18 +186,18 @@ Respond ONLY with valid JSON: { "analysis": "your coaching analysis here" }`;
 }
 
 function buildSwellAlertPrompt(p: any): string {
-  return `You are a surf coach. Based on this 24-hour forecast for a surfer's home break, 
-decide if there is a genuinely good surf window today worth alerting them about. 
+  return `You are a surf coach. Based on this 24-hour forecast for a surfer's home break,
+decide if there is a genuinely good surf window today worth alerting them about.
 Only say YES if conditions are clearly above average (good swell, offshore wind, decent period).
 
 FORECAST (next 24h):
 ${p.forecastSummary}
 
 Respond ONLY with valid JSON:
-{
-  "shouldAlert": true | false,
-  "window": "e.g. 7am–9am",
-  "message": "One short sentence (max 15 words) in surfer language describing why it's worth going out."
+
+"shouldAlert": true | false,
+"window": "e.g. 7am–9am",
+"message": "One short sentence (max 15 words) in surfer language describing why it's worth going out."
 }`;
 }
 

@@ -1,4 +1,4 @@
-export async function callGeminiRaw(prompt: string, temperature = 0.7, maxOutputTokens = 1024): Promise<string> {
+export async function callGeminiRaw(prompt: string, temperature = 0.7, maxOutputTokens = 2048): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('GEMINI_API_KEY not set');
 

@@ -42,8 +42,11 @@ export async function getGeminiInsight(
   quiver?: Board[],
 ): Promise<GeminiInsight> {
 
+  const now = new Date(); // ← ADDED
+
   const daylightForecast = forecast.filter(f => {
     const date = new Date(f.forecastHour);
+    if (date < now) return false; // ← ADDED: skip past hours
     const sun = SunCalc.getTimes(date, coords.lat, coords.lng);
     return date >= sun.sunrise && date <= sun.sunset;
   });
@@ -107,13 +110,9 @@ export async function getGeminiInsight(
       }
     });
 
-    console.log('🔍 Raw Gemini response:', rawText);         // ← ADDED
     const match = rawText.match(/\{[\s\S]*\}/);
     if (!match) throw new Error('No JSON object found in Gemini response');
-    const jsonStr = match[0];
-    console.log('🔍 Extracted JSON:', jsonStr);              // ← ADDED
-
-    return sanitiseInsight(JSON.parse(jsonStr));
+    return sanitiseInsight(JSON.parse(match[0]));
   } catch (err) {
     console.error('Gemini insight fetch failed', err);
     return getFallbackInsight();
