@@ -55,8 +55,6 @@ export default defineConfig(({ mode }) => {
           ],
         },
         workbox: {
-          skipWaiting: true,   // force new SW to activate immediately on install
-          clientsClaim: true,  // take control of all open tabs instantly
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
           runtimeCaching: [
             {
