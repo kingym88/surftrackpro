@@ -1,22 +1,45 @@
-const CACHE_PREFIX = 'stp_gemini_';
+import { doc, getDoc, setDoc, deleteDoc, Timestamp } from 'firebase/firestore';
+import { db } from '../firebase';
 
-export function getGeminiCache(key: string): string | null {
+export async function getGeminiCache(uid: string, key: string): Promise<string | null> {
+  if (!uid) return null;
+  
   try {
-    return localStorage.getItem(`${CACHE_PREFIX}${key}`);
-  } catch {
+    const docRef = doc(db, 'users', uid, 'geminiCache', key);
+    const snap = await getDoc(docRef);
+    if (!snap.exists()) return null;
+
+    const data = snap.data();
+    if (!data.value || !data.createdAt) return null;
+
+    // Check TTL — 24 hours
+    const now = Date.now();
+    const created = data.createdAt.toMillis();
+    const ttlMs = 24 * 60 * 60 * 1000;
+
+    if (now - created > ttlMs) {
+      await deleteDoc(docRef);
+      return null;
+    }
+
+    return data.value as string;
+  } catch (err) {
+    console.error('Failed reading Gemini cache from Firestore:', err);
     return null;
   }
 }
 
-export function setGeminiCache(key: string, value: string): void {
+export async function setGeminiCache(uid: string, key: string, value: string): Promise<void> {
+  if (!uid) return;
+
   try {
-    // Remove all previous stp_gemini entries to keep storage clean
-    Object.keys(localStorage)
-      .filter(k => k.startsWith(CACHE_PREFIX) && k !== `${CACHE_PREFIX}${key}`)
-      .forEach(k => localStorage.removeItem(k));
-    localStorage.setItem(`${CACHE_PREFIX}${key}`, value);
-  } catch {
-    // localStorage full or unavailable — fail silently
+    const docRef = doc(db, 'users', uid, 'geminiCache', key);
+    await setDoc(docRef, {
+      value,
+      createdAt: Timestamp.now(),
+    });
+  } catch (err) {
+    console.error('Failed writing Gemini cache to Firestore:', err);
   }
 }
 

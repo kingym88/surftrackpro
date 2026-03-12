@@ -1,65 +1,38 @@
 import * as SunCalc from 'suncalc';
-import type { ForecastSnapshot, SpotBreakProfile, SessionLog, GeminiInsight } from '@/types';
+import { Timestamp } from 'firebase/firestore';
+import { getFunctions, httpsCallable } from 'firebase/functions';
+import type { ForecastSnapshot, SpotBreakProfile, SessionLog, GeminiInsight, ConditionsSnapshot } from '@/types';
 
 const GEMINI_API_URL =
   'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
 // ─── Main function ────────────────────────────────────────────────────────────
 export async function getGeminiInsight(
-  forecastOrMessages: ForecastSnapshot[] | Array<{role: string, content: string}>,
-  profileOrContext?: SpotBreakProfile | any[],
-  history?: SessionLog[],
-  preferredWaveHeight?: { min: number; max: number },
-  coords?: { lat: number; lng: number },
+  forecast: ForecastSnapshot[],
+  profile: SpotBreakProfile,
+  history: SessionLog[],
+  preferredWaveHeight: { min: number; max: number } | undefined,
+  coords: { lat: number; lng: number },
 ): Promise<GeminiInsight> {
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY ?? process.env.GEMINI_API_KEY;
-  if (!apiKey || apiKey === 'PLACEHOLDER_GEMINI_API_KEY') {
-    return getFallbackInsight();
-  }
-
-  let prompt = '';
-
-  if (Array.isArray(forecastOrMessages) && forecastOrMessages.length > 0 && typeof forecastOrMessages[0] === 'object' && 'role' in forecastOrMessages[0]) {
-      // Handle alternative generic message format (used in Post-Session analysis)
-      prompt = (forecastOrMessages as Array<{role: string, content: string}>).map(m => m.content).join('\n');
-  } else {
-      // Handle original forecast payload
-      prompt = buildPrompt(
-         forecastOrMessages as ForecastSnapshot[],
-         profileOrContext as SpotBreakProfile,
-         history || [],
-         preferredWaveHeight,
-         coords ?? { lat: 39.36, lng: -9.38 }, // fallback: Peniche, Portugal
-      );
-  }
-
-  const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: {
-        responseMimeType: 'application/json',
-        temperature: 0.7,
-        maxOutputTokens: 1024,
-      },
-    }),
-  });
-
-  if (!response.ok) {
-    console.error('Gemini API error:', response.status);
-    return getFallbackInsight();
-  }
-
-  const data = await response.json();
-  const rawText: string =
-    data?.candidates?.[0]?.content?.parts?.[0]?.text ?? '{}';
+  const prompt = buildPrompt(forecast, profile, history, preferredWaveHeight, coords);
 
   try {
-    const parsed = JSON.parse(rawText) as GeminiInsight;
+    const functions = getFunctions();
+    const callGemini = httpsCallable<{ prompt: string; temperature: number; maxOutputTokens: number }, { text: string }>(functions, 'callGemini');
+    
+    const result = await callGemini({ 
+      prompt, 
+      temperature: 0.7, 
+      maxOutputTokens: 1024 
+    });
+    
+    const rawText = result.data.text;
+    const jsonStr = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+
+    const parsed = JSON.parse(jsonStr) as GeminiInsight;
     return sanitiseInsight(parsed);
-  } catch {
-    console.error('Failed to parse Gemini response:', rawText);
+  } catch (err) {
+    console.error('Gemini insight fetch failed', err);
     return getFallbackInsight();
   }
 }
@@ -70,11 +43,6 @@ export async function getSurfMatchInsights(
   userPrefs?: { min: number; max: number },
   coords?: { lat: number; lng: number },
 ): Promise<Record<string, string>> {
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY ?? process.env.GEMINI_API_KEY;
-  if (!apiKey || apiKey === 'PLACEHOLDER_GEMINI_API_KEY') {
-    return {};
-  }
-
   // Group forecasts by date
   const byDate: Record<string, ForecastSnapshot[]> = {};
   allForecasts.forEach(f => {
@@ -82,63 +50,51 @@ export async function getSurfMatchInsights(
     if (!byDate[date]) byDate[date] = [];
     byDate[date].push(f);
   });
-
+  
   const dates = Object.keys(byDate).sort().slice(0, 7);
-
-  // Build a compact per-day summary for the prompt
   const daySummaries = dates.map(date => {
     const snaps = byDate[date];
-    const best = snaps.reduce((a, b) => (b.waveHeight > a.waveHeight ? b : a));
-    return `${date}: waves ${best.waveHeight.toFixed(1)}m @ ${best.wavePeriod.toFixed(0)}s, ` +
-      `wind ${best.windSpeed.toFixed(0)}km/h from ${best.windDirection}°, ` +
-      `swell from ${best.swellDirection}°`;
-  }).join('\n');
-
-  const wavePreference = userPrefs
-    ? `Surfer prefers waves between ${userPrefs.min}m and ${userPrefs.max}m.`
-    : 'No specific wave height preference.';
-
-  const prompt = `You are an expert surf coach. A surfer is viewing a 7-day forecast 
-for a ${breakProfile.breakType} break facing ${breakProfile.facingDirection}, 
-optimal swell from ${breakProfile.optimalSwellDirection}, 
-best tide: ${breakProfile.optimalTidePhase}, 
-offshore wind: ${breakProfile.optimalWindDirection}.
-
-${wavePreference}
-
-7-DAY FORECAST:
-${daySummaries}
-
-Write a SHORT 1-sentence coaching insight for each day (friendly surfer language, 
-max 20 words per day). Only reference what the data shows.
-
-Respond ONLY with valid JSON in this exact format (no markdown, no extra text):
-{
-  "YYYY-MM-DD": "one sentence insight",
-  "YYYY-MM-DD": "one sentence insight"
-}`;
-
-  const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: {
-        responseMimeType: 'application/json',
-        temperature: 0.6,
-        maxOutputTokens: 512,
-      },
-    }),
+    const best = snaps.reduce((max, obj) => obj.waveHeight > max.waveHeight ? obj : max, snaps[0]);
+    return `${date}: MAX waves ${best.waveHeight.toFixed(1)}m @ ${best.wavePeriod.toFixed(0)}s, wind ${best.windSpeed.toFixed(0)}km/h`;
   });
 
-  if (!response.ok) return {};
+  const prompt = `You are an elite virtual surf coach analysing a spot's 7-day forecast.
+  
+SPOT PROFILE:
+- Optimal Swell: ${breakProfile.optimalSwellDirection}
+- Optimal Wind: ${breakProfile.optimalWindDirection}
+- Pre-filtered Best Windows (one per day):
+${daySummaries.join('\n')}
 
-  const data = await response.json();
-  const rawText: string = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? '{}';
+USER PREF: ${userPrefs ? `${userPrefs.min}m - ${userPrefs.max}m wave height` : 'No preference set.'}
+
+TASK:
+Provide exactly one short, punchy sentence (max 15 words) per day giving a qualitative coaching opinion on that day's specific condition.
+Speak naturally like a surfer. Do not include the date or introductory phrases.
+
+Respond ONLY with a valid JSON Record<string, string> where the key is the YYYY-MM-DD date and the value is the sentence.
+Example format:
+{
+  "2026-03-01": "Punchy and offshore all morning, grab the shorty.",
+  "2026-03-02": "Blowing heavy onshore, might be blown out."
+}`;
 
   try {
-    return JSON.parse(rawText) as Record<string, string>;
-  } catch {
+    const functions = getFunctions();
+    const callGemini = httpsCallable<{ prompt: string; temperature: number; maxOutputTokens: number }, { text: string }>(functions, 'callGemini');
+    
+    const result = await callGemini({ 
+      prompt, 
+      temperature: 0.6, 
+      maxOutputTokens: 1024 
+    });
+    
+    const rawText = result.data.text;
+    const jsonStr = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+
+    return JSON.parse(jsonStr) as Record<string, string>;
+  } catch (err) {
+    console.error('SurfMatch Gemini insight fetch failed', err);
     return {};
   }
 }

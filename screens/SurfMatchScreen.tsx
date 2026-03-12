@@ -164,7 +164,7 @@ export const SurfMatchScreen: React.FC<SurfMatchScreenProps> = ({ onNavigate }) 
             const cacheKey = `surfmatch_insights_${topSpotId}_${today}`;
 
             // Check cache first
-            const cached = getGeminiCache(cacheKey);
+            const cached = await getGeminiCache(user.uid, cacheKey);
             if (cached) {
                 setAllDayInsights(JSON.parse(cached));
                 return;
@@ -192,7 +192,7 @@ export const SurfMatchScreen: React.FC<SurfMatchScreenProps> = ({ onNavigate }) 
                     topSpot.coordinates
                 );
 
-                setGeminiCache(cacheKey, JSON.stringify(insights));
+                await setGeminiCache(user.uid, cacheKey, JSON.stringify(insights));
                 setAllDayInsights(insights);
             } catch(e) {
                 console.warn('Surf match insights failed:', e);
@@ -200,7 +200,7 @@ export const SurfMatchScreen: React.FC<SurfMatchScreenProps> = ({ onNavigate }) 
         };
 
         loadInsights();
-    }, [topSpotId]);
+    }, [topSpotId, user]);
 
     // -- Handlers -- 
     const handleBookmarkCondition = async (matchPayload: MatchResult, bookmarkFormat: 'history' | 'wishlist') => {

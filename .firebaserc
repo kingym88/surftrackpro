@@ -1,8 +1,5 @@
 {
   "projects": {
-    "default": "surftrack-pro",
-    "staging": "surftrack-pro"
-  },
-  "targets": {},
-  "etags": {}
+    "default": "surftrack-pro"
+  }
 }

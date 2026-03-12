@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useApp } from '@/src/context/AppContext';
+import { useAuth } from '@/src/context/AuthContext';
 import { getGeminiInsight } from '@/src/services/geminiInsight';
 import { GuestGate } from '@/src/components/GuestGate';
 import { PORTUGAL_SPOTS } from '@/src/data/portugalSpots';
@@ -21,6 +22,7 @@ interface SkillProgressionScreenProps {
 
 export const SkillProgressionScreen: React.FC<SkillProgressionScreenProps> = ({ onBack }) => {
   const { isGuest, sessions, homeSpotId, forecasts, preferredWaveHeight } = useApp();
+  const { user } = useAuth();
   const [timeframe, setTimeframe] = useState<'30' | '90' | 'ALL'>('30');
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
   const [isLoadingAnalysis, setIsLoadingAnalysis] = useState(false);
@@ -116,7 +118,7 @@ export const SkillProgressionScreen: React.FC<SkillProgressionScreenProps> = ({ 
 
   useEffect(() => {
     const getCoaching = async () => {
-      if (filteredSessions.length === 0 || !homeSpotId || !homeSpot || isGuest) return;
+      if (filteredSessions.length === 0 || !homeSpotId || !homeSpot || isGuest || !user) return;
 
       const cacheKey = buildCoachCacheKey(homeSpotId, filteredSessions.length, timeframe);
 
@@ -124,8 +126,8 @@ export const SkillProgressionScreen: React.FC<SkillProgressionScreenProps> = ({ 
       if (cacheKey === lastCacheKey.current) return;
       lastCacheKey.current = cacheKey;
 
-      // Check localStorage cache first
-      const cached = getGeminiCache(cacheKey);
+      // Check cache first
+      const cached = await getGeminiCache(user.uid, cacheKey);
       if (cached) {
         setAiAnalysis(cached);
         return;
@@ -141,7 +143,7 @@ export const SkillProgressionScreen: React.FC<SkillProgressionScreenProps> = ({ 
           preferredWaveHeight || { min: 0.5, max: 3.0 },
           { lat: homeSpot.latitude, lng: homeSpot.longitude }
         );
-        setGeminiCache(cacheKey, result.summary);
+        await setGeminiCache(user.uid, cacheKey, result.summary);
         setAiAnalysis(result.summary);
       } catch(e) {
         console.error('Gemini coaching failed:', e);
@@ -152,7 +154,7 @@ export const SkillProgressionScreen: React.FC<SkillProgressionScreenProps> = ({ 
 
     const timeoutId = setTimeout(getCoaching, 800);
     return () => clearTimeout(timeoutId);
-  }, [filteredSessions.length, homeSpotId, timeframe, isGuest, homeSpot, forecasts, preferredWaveHeight]);
+  }, [filteredSessions.length, homeSpotId, timeframe, isGuest, homeSpot, forecasts, preferredWaveHeight, user]);
 
 
   return (

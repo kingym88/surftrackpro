@@ -47,27 +47,33 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
     : undefined;
 
   useEffect(() => {
-    if (homeSpotId && homeForecast && !isGuest && homeSpot) {
+    if (homeSpotId && homeForecast && !isGuest && homeSpot && user) {
       const cacheKey = buildHomeCacheKey(homeSpotId);
-      const cached = getGeminiCache(cacheKey);
+      
+      const fetchWithCache = async () => {
+        setLoadingInsight(true);
+        const cached = await getGeminiCache(user.uid, cacheKey);
 
-      if (cached) {
-        setInsight(JSON.parse(cached));
-        return;
-      }
+        if (cached) {
+          setInsight(JSON.parse(cached));
+          setLoadingInsight(false);
+          return;
+        }
 
-      setLoadingInsight(true);
-      const breakProfile = homeSpot.breakProfile;
+        const breakProfile = homeSpot.breakProfile;
 
-      getGeminiInsight(homeForecast, breakProfile, sessions, preferredWaveHeight || { min: 0.5, max: 3.0 }, { lat: homeSpot.latitude, lng: homeSpot.longitude })
-        .then((result) => {
-          setGeminiCache(cacheKey, JSON.stringify(result));
-          setInsight(result);
-        })
-        .catch(console.error)
-        .finally(() => setLoadingInsight(false));
+        getGeminiInsight(homeForecast, breakProfile, sessions, preferredWaveHeight || { min: 0.5, max: 3.0 }, { lat: homeSpot.latitude, lng: homeSpot.longitude })
+          .then(async (result) => {
+            await setGeminiCache(user.uid, cacheKey, JSON.stringify(result));
+            setInsight(result);
+          })
+          .catch(console.error)
+          .finally(() => setLoadingInsight(false));
+      };
+
+      fetchWithCache();
     }
-  }, [homeSpotId, homeForecast, isGuest, sessions, preferredWaveHeight, homeSpot]);
+  }, [homeSpotId, homeForecast, isGuest, sessions, preferredWaveHeight, homeSpot, user]);
 
   const handleSpotSelect = async (spotId: string) => {
     setHomeSpotId(spotId);

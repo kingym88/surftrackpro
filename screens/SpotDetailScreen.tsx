@@ -11,6 +11,7 @@ import { fetchOpenMeteoForecast } from '@/src/services/openMeteo';
 import { useUnits } from '@/src/hooks/useUnits';
 import { computeSwellQuality, getBestSurfWindow } from '@/src/services/swellQuality';
 import { getGeminiInsight } from '@/src/services/geminiInsight';
+import { getGeminiCache, setGeminiCache } from '@/src/utils/geminiCache';
 import { fetchTidePredictions } from '@/src/services/tides';
 import {
   ComposedChart,
@@ -102,14 +103,40 @@ export const SpotDetailScreen: React.FC<SpotDetailScreenProps> = ({ onNavigate, 
 
   // 7.6 Best Session Windows
   useEffect(() => {
-    if (activeTab === 'ANALYSIS' && localForecasts.length > 0 && spot && !isGuest) {
+    if (activeTab === 'ANALYSIS' && localForecasts.length > 0 && spot && !isGuest && user) {
       setLoadingInsight(true);
-      getGeminiInsight(localForecasts, spot.breakProfile!, sessions, preferredWaveHeight || { min: 0.5, max: 3.0 }, spot.coordinates)
-        .then(setInsight)
-        .catch(console.error)
-        .finally(() => setLoadingInsight(false));
+      
+      const fetchWithCache = async () => {
+        const today = new Date().toISOString().slice(0, 10);
+        const cacheKey = `spot_analysis_${spot.id}_${today}`;
+        
+        const cached = await getGeminiCache(user.uid, cacheKey);
+        if (cached) {
+          setInsight(JSON.parse(cached));
+          setLoadingInsight(false);
+          return;
+        }
+
+        try {
+          const result = await getGeminiInsight(
+            localForecasts, 
+            spot.breakProfile!, 
+            sessions, 
+            preferredWaveHeight || { min: 0.5, max: 3.0 }, 
+            spot.coordinates
+          );
+          await setGeminiCache(user.uid, cacheKey, JSON.stringify(result));
+          setInsight(result);
+        } catch(e) {
+          console.error(e);
+        } finally {
+          setLoadingInsight(false);
+        }
+      };
+
+      fetchWithCache();
     }
-  }, [activeTab, localForecasts, spot, isGuest, sessions, preferredWaveHeight]);
+  }, [activeTab, localForecasts, spot, isGuest, sessions, preferredWaveHeight, user]);
 
   const currentCondition = useMemo(() => {
     if (!localForecasts.length || !spot?.breakProfile) return null;
