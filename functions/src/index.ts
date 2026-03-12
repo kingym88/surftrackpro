@@ -9,7 +9,11 @@ const geminiApiKey = defineSecret('GEMINI_API_KEY');
 
 admin.initializeApp();
 
-async function requireAuth(req: Request, res: Response, next: () => Promise<void>): Promise<void> {
+async function requireAuth(
+  req: Request,
+  res: Response,
+  next: () => Promise<void>
+): Promise<void> {
   const authHeader = req.headers.authorization ?? '';
   const idToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
 
@@ -35,7 +39,6 @@ export const callGemini = onRequest(
     region: 'us-central1',
   },
   (req, res) => requireAuth(req, res, async () => {
-
     const { data } = req.body;
     const { type, payload } = data ?? {};
 
@@ -89,7 +92,7 @@ export const callGemini = onRequest(
   })
 );
 
-// ─── Prompt builders (server-side only) ──────────────────────────────────────
+// ─── Prompt builders ──────────────────────────────────────────────────────────
 
 function buildSpotAnalysisPrompt(p: any): string {
   return `You are an expert surf coach and meteorologist analysing surf forecasts.
@@ -202,7 +205,6 @@ export const dailySwellAlert = onSchedule('every day 06:00', async () => {
   const db = admin.firestore();
   const messaging = admin.messaging();
 
-  // 1. Get all users who have a homeSpotId set
   const usersSnap = await db.collection('users').get();
 
   for (const userDoc of usersSnap.docs) {
@@ -211,21 +213,18 @@ export const dailySwellAlert = onSchedule('every day 06:00', async () => {
     const homeSpotId = userData.homeSpotId;
     if (!homeSpotId) continue;
 
-    // 2. Get the user's FCM tokens
     const tokensSnap = await db.collection(`users/${uid}/fcmTokens`).get();
     if (tokensSnap.empty) continue;
     const tokens = tokensSnap.docs.map(d => d.data().token as string);
 
-    // 3. Fetch forecast for homeSpot from Firestore (pre-computed forecasts)
     const forecastSnap = await db.collection(`spots/${homeSpotId}/forecasts`).limit(56).get();
     if (forecastSnap.empty) continue;
-    
+
     const forecastsDoc = forecastSnap.docs[0];
-    const forecasts = forecastsDoc.data().data || forecastsDoc.data(); 
+    const forecasts = forecastsDoc.data().data || forecastsDoc.data();
 
     if (!Array.isArray(forecasts)) continue;
 
-    // 4. Build a compact summary for Gemini
     const next24hForecasts = forecasts.filter((f: any) => {
       const fTime = new Date(f.forecastHour).getTime();
       const now = Date.now();
@@ -238,7 +237,6 @@ export const dailySwellAlert = onSchedule('every day 06:00', async () => {
       `${f.forecastHour}: ${f.waveHeight.toFixed(1)}m @ ${f.wavePeriod.toFixed(0)}s, wind ${f.windSpeed.toFixed(0)}km/h from ${f.windDirection}°`
     ).join('\n');
 
-    // 5. Call Gemini through the server-side prompt builder
     try {
       const rawText = await callGeminiRaw(
         buildSwellAlertPrompt({ forecastSummary: forecastSummaryStr }),
@@ -255,7 +253,6 @@ export const dailySwellAlert = onSchedule('every day 06:00', async () => {
 
       if (!alertData.shouldAlert) continue;
 
-      // 6. Send FCM push notification
       const notification = {
         title: `🌊 Surf Alert — ${alertData.window}`,
         body: alertData.message,
