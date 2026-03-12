@@ -1,5 +1,5 @@
 import * as SunCalc from 'suncalc';
-import { getAuth } from 'firebase/auth';
+import { getAuth, User } from 'firebase/auth';
 import { app } from '@/src/firebase';
 import type { ForecastSnapshot, SpotBreakProfile, SessionLog, GeminiInsight, ConditionsSnapshot, Board } from '@/types';
 
@@ -8,7 +8,7 @@ const isDev = import.meta.env.DEV;
 async function callGemini(data: { type: string; payload: Record<string, any> }): Promise<string> {
   const auth = getAuth(app);
 
-  const user = await new Promise<ReturnType<typeof auth.currentUser>>((resolve) => {
+  const user = await new Promise<User | null>((resolve) => {
     const unsubscribe = auth.onAuthStateChanged((u) => {
       unsubscribe();
       resolve(u);

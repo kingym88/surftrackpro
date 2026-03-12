@@ -31,28 +31,34 @@ const params_1 = require("firebase-functions/params");
 const geminiHelper_1 = require("./geminiHelper");
 const geminiApiKey = (0, params_1.defineSecret)('GEMINI_API_KEY');
 admin.initializeApp();
-exports.callGemini = (0, https_1.onCall)({
-    cors: ['https://surftrack-pro.web.app', 'http://localhost:5173'],
-    secrets: [geminiApiKey],
-}, async (request) => {
-    var _a, _b, _c;
-    // Verify the Authorization header manually for fetch-based calls
-    const authHeader = (_c = (_b = (_a = request.rawRequest) === null || _a === void 0 ? void 0 : _a.headers) === null || _b === void 0 ? void 0 : _b.authorization) !== null && _c !== void 0 ? _c : '';
+async function requireAuth(req, res, next) {
+    var _a;
+    const authHeader = (_a = req.headers.authorization) !== null && _a !== void 0 ? _a : '';
     const idToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
     if (!idToken) {
-        throw new https_1.HttpsError('unauthenticated', 'Must be signed in.');
+        res.status(401).json({ error: 'Unauthenticated' });
+        return;
     }
     try {
         await admin.auth().verifyIdToken(idToken);
     }
-    catch (_d) {
-        throw new https_1.HttpsError('unauthenticated', 'Invalid or expired token.');
+    catch (_b) {
+        res.status(401).json({ error: 'Invalid or expired token' });
+        return;
     }
-    const { type, payload } = request.data;
+    await next();
+}
+exports.callGemini = (0, https_1.onRequest)({
+    cors: ['https://surftrack-pro.web.app', 'http://localhost:5173'],
+    secrets: [geminiApiKey],
+    region: 'us-central1',
+}, (req, res) => requireAuth(req, res, async () => {
+    const { data } = req.body;
+    const { type, payload } = data !== null && data !== void 0 ? data : {};
     if (!type || !payload) {
-        throw new https_1.HttpsError('invalid-argument', 'Missing type or payload.');
+        res.status(400).json({ error: 'Missing type or payload' });
+        return;
     }
-    // Build prompt server-side based on type
     let prompt;
     let temperature = 0.7;
     let maxOutputTokens = 1024;
@@ -79,20 +85,21 @@ exports.callGemini = (0, https_1.onCall)({
             maxOutputTokens = 256;
             break;
         default:
-            throw new https_1.HttpsError('invalid-argument', `Unknown type: ${type}`);
+            res.status(400).json({ error: `Unknown type: ${type}` });
+            return;
     }
-    // Hard cap as safety net
     if (prompt.length > 12000) {
-        throw new https_1.HttpsError('invalid-argument', 'Payload too large.');
+        res.status(400).json({ error: 'Payload too large.' });
+        return;
     }
     try {
         const text = await (0, geminiHelper_1.callGeminiRaw)(prompt, temperature, maxOutputTokens);
-        return { text };
+        res.json({ result: { text } });
     }
     catch (error) {
-        throw new https_1.HttpsError('internal', error.message);
+        res.status(500).json({ error: error.message });
     }
-});
+}));
 // ─── Prompt builders (server-side only) ──────────────────────────────────────
 function buildSpotAnalysisPrompt(p) {
     var _a, _b, _c, _d;

@@ -1,6 +1,7 @@
 import * as admin from 'firebase-admin';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
-import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import { onRequest } from 'firebase-functions/v2/https';
+import type { Request, Response } from 'express';
 import { defineSecret } from 'firebase-functions/params';
 import { callGeminiRaw } from './geminiHelper';
 
@@ -8,33 +9,45 @@ const geminiApiKey = defineSecret('GEMINI_API_KEY');
 
 admin.initializeApp();
 
-export const callGemini = onCall(
+async function requireAuth(
+  req: Request,
+  res: Response,
+  next: () => Promise<void>
+): Promise<void> {
+  const authHeader = req.headers.authorization ?? '';
+  const idToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+
+  if (!idToken) {
+    res.status(401).json({ error: 'Unauthenticated' });
+    return;
+  }
+
+  try {
+    await admin.auth().verifyIdToken(idToken);
+  } catch {
+    res.status(401).json({ error: 'Invalid or expired token' });
+    return;
+  }
+
+  await next();
+}
+
+export const callGemini = onRequest(
   {
     cors: ['https://surftrack-pro.web.app', 'http://localhost:5173'],
     secrets: [geminiApiKey],
+    region: 'us-central1',
   },
-  async (request) => {
-    // Verify the Authorization header manually for fetch-based calls
-    const authHeader = request.rawRequest?.headers?.authorization ?? '';
-    const idToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  (req, res) => requireAuth(req, res, async () => {
 
-    if (!idToken) {
-      throw new HttpsError('unauthenticated', 'Must be signed in.');
-    }
-
-    try {
-      await admin.auth().verifyIdToken(idToken);
-    } catch {
-      throw new HttpsError('unauthenticated', 'Invalid or expired token.');
-    }
-
-    const { type, payload } = request.data;
+    const { data } = req.body;
+    const { type, payload } = data ?? {};
 
     if (!type || !payload) {
-      throw new HttpsError('invalid-argument', 'Missing type or payload.');
+      res.status(400).json({ error: 'Missing type or payload' });
+      return;
     }
 
-    // Build prompt server-side based on type
     let prompt: string;
     let temperature = 0.7;
     let maxOutputTokens = 1024;
@@ -62,21 +75,22 @@ export const callGemini = onCall(
         maxOutputTokens = 256;
         break;
       default:
-        throw new HttpsError('invalid-argument', `Unknown type: ${type}`);
+        res.status(400).json({ error: `Unknown type: ${type}` });
+        return;
     }
 
-    // Hard cap as safety net
     if (prompt.length > 12000) {
-      throw new HttpsError('invalid-argument', 'Payload too large.');
+      res.status(400).json({ error: 'Payload too large.' });
+      return;
     }
 
     try {
       const text = await callGeminiRaw(prompt, temperature, maxOutputTokens);
-      return { text };
+      res.json({ result: { text } });
     } catch (error: any) {
-      throw new HttpsError('internal', error.message);
+      res.status(500).json({ error: error.message });
     }
-  }
+  })
 );
 
 // ─── Prompt builders (server-side only) ──────────────────────────────────────
