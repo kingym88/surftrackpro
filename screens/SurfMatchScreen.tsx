@@ -38,7 +38,7 @@ interface SurfMatchScreenProps {
 
 export const SurfMatchScreen: React.FC<SurfMatchScreenProps> = ({ onNavigate }) => {
     const { user } = useAuth();
-    const { spots, tides, homeSpotId } = useApp();
+    const { spots, tides, homeSpotId, forecastFetchedAt, isForecastStale } = useApp();
     const units = useUnits();
 
     const [selectedDayIndex, setSelectedDayIndex] = useState(0);
@@ -328,6 +328,12 @@ export const SurfMatchScreen: React.FC<SurfMatchScreenProps> = ({ onNavigate }) 
 
                 {!isLoading && !error && (
                     <div className="space-y-6">
+                        {homeSpotId && isForecastStale(homeSpotId, 180) && (
+                          <div className="bg-amber-900/40 rounded-lg p-2 text-amber-300 text-xs flex items-center gap-2 mb-3">
+                            <span className="material-icons-round text-sm">schedule</span>
+                            Forecast data may be outdated — results based on last fetch
+                          </div>
+                        )}
                         {matches.map((match, idx) => {
                             const isTopMatch = idx === 0;
                             const dtPoint = new Date(match.forecast.forecastHour);

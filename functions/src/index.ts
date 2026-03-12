@@ -1,13 +1,13 @@
-import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
+import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { callGeminiRaw } from './geminiHelper';
 
 admin.initializeApp();
 
-export const callGemini = functions.https.onCall(async (request) => {
+export const callGemini = onCall(async (request) => {
   if (!request.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'Must be signed in.');
+    throw new HttpsError('unauthenticated', 'Must be signed in.');
   }
 
   const { prompt, temperature = 0.7, maxOutputTokens = 1024 } = request.data;
@@ -16,7 +16,7 @@ export const callGemini = functions.https.onCall(async (request) => {
     const text = await callGeminiRaw(prompt, temperature, maxOutputTokens);
     return { text };
   } catch (error: any) {
-    throw new functions.https.HttpsError('internal', error.message);
+    throw new HttpsError('internal', error.message);
   }
 });
 

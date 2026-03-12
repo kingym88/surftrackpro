@@ -40,7 +40,7 @@ type Tab = 'FORECAST' | 'ANALYSIS' | 'CAMS' | 'LOGS';
 
 export const SpotDetailScreen: React.FC<SpotDetailScreenProps> = ({ onNavigate, onBack, spot }) => {
   const [activeTab, setActiveTab] = useState<Tab>('FORECAST');
-  const { isGuest, sessions, preferredWaveHeight, qualityScores, forecasts, tides, setForecast, setTides, quiver } = useApp();
+  const { isGuest, sessions, preferredWaveHeight, qualityScores, forecasts, tides, setForecast, setTides, quiver, forecastFetchedAt, isForecastStale, isLoadingForecast } = useApp();
   const units = useUnits();
   const { user } = useAuth();
   
@@ -100,6 +100,17 @@ export const SpotDetailScreen: React.FC<SpotDetailScreenProps> = ({ onNavigate, 
     
     loadForecasts();
   }, [spot]);
+
+  const forecastUpdatedLabel = (() => {
+    const spotId = spot?.id;
+    if (!spotId) return '';
+    const fetchedAt = forecastFetchedAt[spotId];
+    if (fetchedAt === null || fetchedAt === undefined) return isGuest ? 'Demo data' : 'Loading...';
+    const diffMins = Math.floor((Date.now() - fetchedAt) / 60000);
+    if (diffMins < 1) return 'Updated just now';
+    if (diffMins < 60) return `Updated ${diffMins}m ago`;
+    return `Updated ${Math.floor(diffMins / 60)}h ago`;
+  })();
 
   // 7.6 Best Session Windows
   useEffect(() => {
@@ -296,6 +307,13 @@ export const SpotDetailScreen: React.FC<SpotDetailScreenProps> = ({ onNavigate, 
               <div className="bg-amber-900/40 rounded-lg p-2 text-amber-300 text-xs flex items-center gap-2">
                 <span className="material-icons-round text-sm">warning</span>
                 Data may be outdated — live fetch failed.
+              </div>
+            )}
+
+            {isForecastStale(spot?.id ?? '', 180) && !isLoadingForecast && (
+              <div className="bg-amber-900/40 rounded-lg p-2 text-amber-300 text-xs flex items-center gap-2 mx-4 mt-2">
+                <span className="material-icons-round text-sm">schedule</span>
+                Forecast may be outdated · {forecastUpdatedLabel}
               </div>
             )}
 

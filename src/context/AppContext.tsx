@@ -4,6 +4,7 @@ import { dummySpots, dummyForecast, dummyTides } from '@/src/data/guestDummyData
 import { getNearestSpots, PORTUGAL_SPOTS } from '@/src/data/portugalSpots';
 import { Geolocation } from '@capacitor/geolocation';
 import { Capacitor } from '@capacitor/core';
+import { App as CapApp } from '@capacitor/app';
 import { Preferences } from '@capacitor/preferences';
 import { fetchOpenMeteoForecast } from '@/src/services/openMeteo';
 import { fetchTidePredictions } from '@/src/services/tides';
@@ -23,6 +24,7 @@ interface AppState {
   homeSpotId: string | null;
   preferredWaveHeight: { min: number; max: number } | null;
   nearbySpotIds: string[];
+  forecastFetchedAt: Record<string, number | null>; // key: spotId, value: unix ms timestamp or null
 }
 
 // ─── Actions ──────────────────────────────────────────────────────────────────
@@ -41,6 +43,7 @@ type Action =
   | { type: 'SET_HOME_SPOT_ID'; payload: string }
   | { type: 'SET_PREFERRED_WAVE_HEIGHT'; payload: { min: number; max: number } }
   | { type: 'SET_NEARBY_SPOTS'; payload: string[] }
+  | { type: 'SET_FORECAST_FETCHED_AT'; payload: { spotId: string; fetchedAt: number | null } }
   | { type: 'LOAD_GUEST_DATA' };
 
 function reducer(state: AppState, action: Action): AppState {
@@ -87,6 +90,14 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, preferredWaveHeight: action.payload };
     case 'SET_NEARBY_SPOTS':
       return { ...state, nearbySpotIds: action.payload };
+    case 'SET_FORECAST_FETCHED_AT':
+      return {
+        ...state,
+        forecastFetchedAt: {
+          ...state.forecastFetchedAt,
+          [action.payload.spotId]: action.payload.fetchedAt,
+        },
+      };
     case 'LOAD_GUEST_DATA':
       return {
         ...state,
@@ -100,6 +111,11 @@ function reducer(state: AppState, action: Action): AppState {
           supertubos: dummyTides,
           carcavelos: dummyTides,
           'ribeira-dilhas': dummyTides,
+        },
+        forecastFetchedAt: {
+          supertubos: null,
+          carcavelos: null,
+          'ribeira-dilhas': null,
         },
       };
     default:
@@ -120,6 +136,7 @@ const initialState: AppState = {
   homeSpotId: 'carcavelos',
   preferredWaveHeight: null,
   nearbySpotIds: getNearestSpots(PORTUGAL_SPOTS, 'carcavelos', 5).map(s => s.id),
+  forecastFetchedAt: {},
 };
 
 // ─── Context ──────────────────────────────────────────────────────────────────
@@ -134,6 +151,8 @@ interface AppContextType extends AppState {
   setGeminiInsight: (spotId: string, data: GeminiInsight) => void;
   setHomeSpotId: (spotId: string) => void;
   setPreferredWaveHeight: (prefs: { min: number; max: number }) => void;
+  isForecastStale: (spotId: string, maxAgeMinutes?: number) => boolean;
+  forecastFetchedAt: Record<string, number | null>;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -275,6 +294,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, isGuest, uid
               fetchTidePredictions(spotData.latitude, spotData.longitude, todayStr),
             ]);
             dispatch({ type: 'SET_FORECAST', payload: { spotId, data: live } });
+            dispatch({ type: 'SET_FORECAST_FETCHED_AT', payload: { spotId, fetchedAt: Date.now() } });
             dispatch({ type: 'SET_TIDES', payload: { spotId, data: tideData } });
           })
         );
@@ -287,6 +307,44 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, isGuest, uid
     
     fetchAllForecasts();
   }, [isGuest, state.homeSpotId, state.nearbySpotIds]);
+
+  // Re-fetch on app resume
+  useEffect(() => {
+    if (isGuest) return;
+    const handle = CapApp.addListener('appStateChange', ({ isActive }) => {
+      if (!isActive || !state.homeSpotId) return;
+      const spotIds = [state.homeSpotId, ...state.nearbySpotIds];
+      const now = Date.now();
+      const THREE_HOURS = 3 * 60 * 60 * 1000;
+      const anyStale = spotIds.some(id => {
+        const fetchedAt = state.forecastFetchedAt[id];
+        return fetchedAt === null || fetchedAt === undefined || (now - fetchedAt) > THREE_HOURS;
+      });
+      if (anyStale) {
+        dispatch({ type: 'SET_FORECAST_ERROR', payload: null });
+        dispatch({ type: 'SET_LOADING_FORECAST', payload: true });
+        
+        const spotsToFetch = [state.homeSpotId!, ...state.nearbySpotIds];
+        Promise.all(
+          spotsToFetch.map(async (spotId) => {
+            const spotData = PORTUGAL_SPOTS.find(s => s.id === spotId);
+            if (!spotData) return;
+            const todayStr = new Date().toISOString().split('T')[0];
+            const [live, tideData] = await Promise.all([
+              fetchOpenMeteoForecast(spotData.latitude, spotData.longitude),
+              fetchTidePredictions(spotData.latitude, spotData.longitude, todayStr),
+            ]);
+            dispatch({ type: 'SET_FORECAST', payload: { spotId, data: live } });
+            dispatch({ type: 'SET_FORECAST_FETCHED_AT', payload: { spotId, fetchedAt: Date.now() } });
+            dispatch({ type: 'SET_TIDES', payload: { spotId, data: tideData } });
+          })
+        )
+          .catch(() => dispatch({ type: 'SET_FORECAST_ERROR', payload: 'Failed to refresh forecasts.' }))
+          .finally(() => dispatch({ type: 'SET_LOADING_FORECAST', payload: false }));
+      }
+    });
+    return () => { handle.then(h => h.remove()); };
+  }, [isGuest, state.homeSpotId, state.nearbySpotIds, state.forecastFetchedAt]);
 
   // Persist sessions and quiver to Preferences
   useEffect(() => {
@@ -337,6 +395,15 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, isGuest, uid
     [],
   );
 
+  const isForecastStale = useCallback(
+    (spotId: string, maxAgeMinutes: number = 180) => {
+      const fetchedAt = state.forecastFetchedAt[spotId];
+      if (fetchedAt === null || fetchedAt === undefined) return true;
+      return (Date.now() - fetchedAt) > maxAgeMinutes * 60 * 1000;
+    },
+    [state.forecastFetchedAt]
+  );
+
   const value: AppContextType = {
     ...state,
     isGuest,
@@ -349,6 +416,8 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children, isGuest, uid
     setGeminiInsight,
     setHomeSpotId,
     setPreferredWaveHeight,
+    forecastFetchedAt: state.forecastFetchedAt,
+    isForecastStale,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

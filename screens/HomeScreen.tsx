@@ -21,7 +21,7 @@ interface HomeScreenProps {
 }
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
-  const { homeSpotId, setHomeSpotId, forecasts, isLoadingForecast, forecastError, isGuest, tides, preferredWaveHeight, nearbySpotIds, sessions, quiver } = useApp();
+  const { homeSpotId, setHomeSpotId, forecasts, isLoadingForecast, forecastError, isGuest, tides, preferredWaveHeight, nearbySpotIds, sessions, quiver, forecastFetchedAt, isForecastStale } = useApp();
   const { user } = useAuth();
   const units = useUnits();
 
@@ -54,17 +54,26 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
         setLoadingInsight(true);
         const cached = await getGeminiCache(user.uid, cacheKey);
 
-        if (cached) {
-          setInsight(JSON.parse(cached));
-          setLoadingInsight(false);
-          return;
+        // Invalidate cache if forecast has been refreshed since insight was generated
+        if (cached && homeSpotId) {
+          const fetchedAt = forecastFetchedAt[homeSpotId];
+          const cachedData = JSON.parse(cached);
+          // If forecast was fetched after the insight was cached, discard the cache
+          if (fetchedAt && cachedData._cachedAt && fetchedAt > cachedData._cachedAt) {
+            // fall through to re-fetch insight
+          } else {
+            setInsight(cachedData);
+            setLoadingInsight(false);
+            return;
+          }
         }
 
         const breakProfile = homeSpot.breakProfile;
 
         getGeminiInsight(homeForecast, breakProfile, sessions, preferredWaveHeight || { min: 0.5, max: 3.0 }, { lat: homeSpot.latitude, lng: homeSpot.longitude }, quiver)
           .then(async (result) => {
-            await setGeminiCache(user.uid, cacheKey, JSON.stringify(result));
+            const insightWithTimestamp = { ...result, _cachedAt: Date.now() };
+            await setGeminiCache(user.uid, cacheKey, JSON.stringify(insightWithTimestamp));
             setInsight(result);
           })
           .catch(console.error)
@@ -73,7 +82,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
 
       fetchWithCache();
     }
-  }, [homeSpotId, homeForecast, isGuest, sessions, preferredWaveHeight, homeSpot, user, quiver]);
+  }, [homeSpotId, homeForecast, isGuest, sessions, preferredWaveHeight, homeSpot, user, quiver, forecastFetchedAt]);
 
   const handleSpotSelect = async (spotId: string) => {
     setHomeSpotId(spotId);
@@ -130,6 +139,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
     if (finalDiff <= 135) return "Cross-shore";
     return "Onshore";
   };
+
+  const forecastUpdatedLabel = (() => {
+    if (!homeSpotId) return '';
+    const fetchedAt = forecastFetchedAt[homeSpotId];
+    if (fetchedAt === null || fetchedAt === undefined) return isGuest ? 'Demo data' : 'Loading...';
+    const diffMins = Math.floor((Date.now() - fetchedAt) / 60000);
+    if (diffMins < 1) return 'Updated just now';
+    if (diffMins < 60) return `Updated ${diffMins}m ago`;
+    return `Updated ${Math.floor(diffMins / 60)}h ago`;
+  })();
 
   const qualityScore = currentSnap ? computeSwellQuality(currentSnap, (homeSpot as any)?.breakProfile || {} as any, { lat: homeSpot?.latitude ?? 0, lng: homeSpot?.longitude ?? 0 }, undefined, homeSpotId ? tides[homeSpotId] : undefined) : null;
 
@@ -210,37 +229,61 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
                   Data may be outdated — tap to retry
                 </div>
               )}
-              <div className="relative overflow-hidden bg-primary rounded-xl p-6 text-white shadow-xl shadow-primary/20 transition-transform group-hover:scale-[1.02]">
-                <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -mr-20 -mt-20"></div>
-                <div className="absolute bottom-0 left-0 w-32 h-32 bg-black/10 rounded-full blur-2xl -ml-10 -mb-10"></div>
-                
-                <div className="relative z-10">
-                  <div className="flex justify-between items-start mb-6">
-                    <div>
-                      <span className="bg-white/20 px-3 py-1 rounded-full text-xs font-semibold backdrop-blur-md">LIVE FORECAST</span>
-                      <h2 className="text-4xl font-bold mt-4 tracking-tight">{units.height(currentSnap?.waveHeight ?? 0)}</h2>
-                      <p className="text-white/80 font-medium">{qualityScore?.label || 'FAIR'}</p>
-                    </div>
+              <div className="relative overflow-hidden bg-primary rounded-2xl p-5 text-white shadow-xl shadow-primary/20 transition-transform group-hover:scale-[1.02]">
+                {/* Background blob */}
+                <div className="absolute bottom-0 right-0 w-40 h-40 bg-white/10 rounded-full blur-3xl translate-x-10 translate-y-10 pointer-events-none" />
+
+                <div className="relative z-10 space-y-3">
+                  {/* Top row: LIVE NOW badge + spot name/updated */}
+                  <div className="flex items-start justify-between">
+                    <span className="bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-[11px] font-bold tracking-widest uppercase">
+                      Live Now
+                    </span>
                     <div className="text-right">
-                      <span className="material-icons-round text-4xl">tsunami</span>
+                      <p className="text-[11px] opacity-50">{forecastUpdatedLabel}</p>
                     </div>
                   </div>
-                  <div className="grid grid-cols-3 gap-4 pt-6 border-t border-white/20">
-                    <div className="flex flex-col items-center">
-                      <span className="material-icons-round text-white/60 text-lg mb-1">timer</span>
-                      <p className="text-sm font-bold">{(currentSnap?.wavePeriod ?? 0).toFixed(0)}s</p>
-                      <p className="text-[10px] uppercase opacity-60">Swell Period</p>
-                    </div>
-                    <div className="flex flex-col items-center">
-                      <span className="material-icons-round text-white/60 text-lg mb-1">air</span>
-                      <p className="text-sm font-bold">{units.speed(currentSnap?.windSpeed ?? 0)} <span className="material-icons-round text-[10px]">{getWindIcon(currentSnap?.windDirection ?? 0)}</span></p>
-                      <p className="text-[10px] uppercase opacity-60">{computeWindLabel(currentSnap?.windDirection ?? 0)}</p>
-                    </div>
-                    <div className="flex flex-col items-center">
-                      <span className="material-icons-round text-white/60 text-lg mb-1">water_drop</span>
-                      <p className="text-sm font-bold">{units.temp(currentSnap?.airTemp ?? 0)}</p>
-                      <p className="text-[10px] uppercase opacity-60">Water Temp</p>
-                    </div>
+
+                  {/* Hero headline */}
+                  <div>
+                    <h2 className="text-5xl font-extrabold tracking-tight leading-none">
+                      {units.height(currentSnap?.waveHeight ?? 0)} <span className="text-3xl font-bold opacity-80">Swell</span>
+                    </h2>
+                  </div>
+
+                  {/* Inline stat pills */}
+                  <div className="flex items-center gap-3">
+                    <span className="flex items-center gap-1.5 bg-white/10 rounded-full px-3 py-1 text-sm font-semibold">
+                      <span className="material-icons-round text-[14px] text-purple-300">waves</span>
+                      {(currentSnap?.wavePeriod ?? 0).toFixed(0)}s Period
+                    </span>
+                    <span className="flex items-center gap-1.5 bg-white/10 rounded-full px-3 py-1 text-sm font-semibold">
+                      <span className="material-icons-round text-[14px] text-pink-300">air</span>
+                      {units.speed(currentSnap?.windSpeed ?? 0)} {computeWindLabel(currentSnap?.windDirection ?? 0)}
+                    </span>
+                  </div>
+
+                  {/* AI summary text */}
+                  <p className="text-sm opacity-70 leading-relaxed">
+                    {loadingInsight
+                      ? 'Analyzing conditions...'
+                      : insight?.summary || `${qualityScore?.label || 'Fair'} conditions. Tap for the full forecast.`}
+                  </p>
+
+                  {/* Bottom CTA row */}
+                  <div className="flex items-center gap-3 pt-1">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); if (homeSpot) onNavigate(Screen.SPOT_DETAIL, { spot: toSurfSpot(homeSpot) }); }}
+                      className="flex-1 bg-white/20 hover:bg-white/30 backdrop-blur-md text-white font-bold py-3 rounded-xl text-sm transition-colors"
+                    >
+                      Full Report
+                    </button>
+                    <button
+                      onClick={(e) => e.stopPropagation()}
+                      className="w-12 h-12 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-xl transition-colors"
+                    >
+                      <span className="material-icons-round text-lg">share</span>
+                    </button>
                   </div>
                 </div>
               </div>
