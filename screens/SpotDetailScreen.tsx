@@ -40,7 +40,7 @@ type Tab = 'FORECAST' | 'ANALYSIS' | 'CAMS' | 'LOGS';
 
 export const SpotDetailScreen: React.FC<SpotDetailScreenProps> = ({ onNavigate, onBack, spot }) => {
   const [activeTab, setActiveTab] = useState<Tab>('FORECAST');
-  const { isGuest, sessions, preferredWaveHeight, qualityScores, forecasts, tides, setForecast, setTides } = useApp();
+  const { isGuest, sessions, preferredWaveHeight, qualityScores, forecasts, tides, setForecast, setTides, quiver } = useApp();
   const units = useUnits();
   const { user } = useAuth();
   
@@ -123,7 +123,8 @@ export const SpotDetailScreen: React.FC<SpotDetailScreenProps> = ({ onNavigate, 
             spot.breakProfile!, 
             sessions, 
             preferredWaveHeight || { min: 0.5, max: 3.0 }, 
-            spot.coordinates
+            spot.coordinates,
+            quiver
           );
           await setGeminiCache(user.uid, cacheKey, JSON.stringify(result));
           setInsight(result);
@@ -136,7 +137,7 @@ export const SpotDetailScreen: React.FC<SpotDetailScreenProps> = ({ onNavigate, 
 
       fetchWithCache();
     }
-  }, [activeTab, localForecasts, spot, isGuest, sessions, preferredWaveHeight, user]);
+  }, [activeTab, localForecasts, spot, isGuest, sessions, preferredWaveHeight, user, quiver]);
 
   const currentCondition = useMemo(() => {
     if (!localForecasts.length || !spot?.breakProfile) return null;

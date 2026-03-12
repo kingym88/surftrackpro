@@ -1,7 +1,7 @@
 import * as SunCalc from 'suncalc';
 import { Timestamp } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import type { ForecastSnapshot, SpotBreakProfile, SessionLog, GeminiInsight, ConditionsSnapshot } from '@/types';
+import type { ForecastSnapshot, SpotBreakProfile, SessionLog, GeminiInsight, ConditionsSnapshot, Board } from '@/types';
 
 const GEMINI_API_URL =
   'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
@@ -13,8 +13,9 @@ export async function getGeminiInsight(
   history: SessionLog[],
   preferredWaveHeight: { min: number; max: number } | undefined,
   coords: { lat: number; lng: number },
+  quiver?: Board[],
 ): Promise<GeminiInsight> {
-  const prompt = buildPrompt(forecast, profile, history, preferredWaveHeight, coords);
+  const prompt = buildPrompt(forecast, profile, history, preferredWaveHeight, coords, quiver);
 
   try {
     const functions = getFunctions();
@@ -52,10 +53,32 @@ export async function getSurfMatchInsights(
   });
   
   const dates = Object.keys(byDate).sort().slice(0, 7);
+  const compassToDeg = (c: string): number => {
+    const map: Record<string, number> = { N: 0, NNE: 22.5, NE: 45, ENE: 67.5, E: 90, ESE: 112.5, SE: 135, SSE: 157.5, S: 180, SSW: 202.5, SW: 225, WSW: 247.5, W: 270, WNW: 292.5, NW: 315, NNW: 337.5 };
+    const key = c.toUpperCase().replace(/[^A-Z]/g, '');
+    return map[key] ?? 0;
+  };
+
+  const isDirectionAligned = (deg1: number, deg2: number) => {
+    const diff = Math.abs(deg1 - deg2) % 360;
+    const finalDiff = diff > 180 ? 360 - diff : diff;
+    return finalDiff <= 45;
+  };
+  
+  const optWindStr = breakProfile.optimalWindDirection ? breakProfile.optimalWindDirection.split(' ')[0].split('-')[0].trim() : 'N';
+  const optWindDeg = compassToDeg(optWindStr);
+
+  const optSwellStr = breakProfile.optimalSwellDirection ? breakProfile.optimalSwellDirection.split(' ')[0].split('-')[0].trim() : 'N';
+  const optSwellDeg = compassToDeg(optSwellStr);
+
   const daySummaries = dates.map(date => {
     const snaps = byDate[date];
     const best = snaps.reduce((max, obj) => obj.waveHeight > max.waveHeight ? obj : max, snaps[0]);
-    return `${date}: MAX waves ${best.waveHeight.toFixed(1)}m @ ${best.wavePeriod.toFixed(0)}s, wind ${best.windSpeed.toFixed(0)}km/h`;
+    
+    const isOffshore = isDirectionAligned(best.windDirection, optWindDeg);
+    const swellAligned = isDirectionAligned(best.swellDirection, optSwellDeg);
+
+    return `${date}: MAX waves ${best.waveHeight.toFixed(1)}m @ ${best.wavePeriod.toFixed(0)}s, wind ${best.windSpeed.toFixed(0)}km/h ${isOffshore ? '✓ offshore' : '✗ onshore'}, swell ${swellAligned ? '✓ aligned' : '✗ cross-swell'}`;
   });
 
   const prompt = `You are an elite virtual surf coach analysing a spot's 7-day forecast.
@@ -106,6 +129,7 @@ function buildPrompt(
   history: SessionLog[],
   preferredWaveHeight: { min: number; max: number } | undefined,
   coords: { lat: number; lng: number },
+  quiver?: Board[],
 ): string {
   // Filter to daylight hours only using SunCalc, then take up to 56 snapshots
   const daylightForecast = forecast.filter(f => {
@@ -138,6 +162,43 @@ function buildPrompt(
     ? `The surfer prefers waves between ${preferredWaveHeight.min}m and ${preferredWaveHeight.max}m.`
     : 'No specific wave height preference set.';
 
+  let boardsUsedText = '';
+  if (quiver && quiver.length > 0 && history.length > 0) {
+    const boardLines = history.slice(0, 5).map(s => {
+      const b = quiver.find(q => q.id === s.boardId);
+      if (b) return `${s.date.slice(0, 10)}: ${b.brand} ${b.model} ${b.volume}L (${b.boardType})`;
+      return null;
+    }).filter(Boolean);
+    if (boardLines.length > 0) {
+      boardsUsedText = `\nBOARDS USED (recent sessions):\n${boardLines.join('\n')}\n`;
+    }
+  }
+
+  let detectedPatternsText = '';
+  if (history.length >= 3) {
+    const tideRatings: Record<string, number[]> = {};
+    history.forEach(s => {
+      const tideType = s.conditionsSnapshot?.tideType ?? 'UNKNOWN';
+      if (!tideRatings[tideType]) tideRatings[tideType] = [];
+      tideRatings[tideType].push(s.rating);
+    });
+    const tidePattern = Object.entries(tideRatings)
+      .map(([tide, ratings]) => {
+        const avg = (ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(1);
+        return `${tide} tide: avg rating ${avg}/5 (${ratings.length} sessions)`;
+      })
+      .join(', ');
+
+    const ratings = history.map(s => s.rating);
+    const first = ratings.slice(-3).reduce((a,b) => a+b, 0) / 3;
+    const last = ratings.slice(0, 3).reduce((a,b) => a+b, 0) / 3;
+    let trend = 'consistent';
+    if (last > first + 0.4) trend = 'improving';
+    if (last < first - 0.4) trend = 'declining';
+
+    detectedPatternsText = `\nDETECTED PATTERNS (computed from session history):\n- Tide correlation: ${tidePattern}\n- Surfer's recent trend: ${trend} based on last ratings\n`;
+  }
+
   return `You are an expert surf coach and meteorologist analysing surf forecasts.
 
 SPOT PROFILE:
@@ -155,7 +216,7 @@ ${forecastSummary}
 
 RECENT SESSION HISTORY:
 ${historyText}
-
+${boardsUsedText}${detectedPatternsText}
 TASK: Analyse the forecast data and identify the best 1–3 session windows in the next 7 days. Consider:
 1. Wave height and period quality
 2. Wind direction (offshore is best)
@@ -171,6 +232,8 @@ energy is high (4–5), they are ready to tackle bigger or more challenging wind
 9. Factor in crowd data from past sessions. If the surfer consistently logs high 
 crowd scores (4–5) at their home spot, prioritise early morning session windows 
 (within 1–2 hours of sunrise) to help them find emptier lineups.
+
+10. Consider the surfer's board choices. If they consistently use a high-volume board (>45L), avoid recommending hollow or powerful reef conditions. If they ride a shortboard (<33L), they can handle steeper and more powerful waves.
 
 Respond ONLY with valid JSON in this exact format (no markdown, no extra text):
 {

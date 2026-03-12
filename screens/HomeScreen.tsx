@@ -21,7 +21,7 @@ interface HomeScreenProps {
 }
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
-  const { homeSpotId, setHomeSpotId, forecasts, isLoadingForecast, forecastError, isGuest, tides, preferredWaveHeight, nearbySpotIds, sessions } = useApp();
+  const { homeSpotId, setHomeSpotId, forecasts, isLoadingForecast, forecastError, isGuest, tides, preferredWaveHeight, nearbySpotIds, sessions, quiver } = useApp();
   const { user } = useAuth();
   const units = useUnits();
 
@@ -62,7 +62,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
 
         const breakProfile = homeSpot.breakProfile;
 
-        getGeminiInsight(homeForecast, breakProfile, sessions, preferredWaveHeight || { min: 0.5, max: 3.0 }, { lat: homeSpot.latitude, lng: homeSpot.longitude })
+        getGeminiInsight(homeForecast, breakProfile, sessions, preferredWaveHeight || { min: 0.5, max: 3.0 }, { lat: homeSpot.latitude, lng: homeSpot.longitude }, quiver)
           .then(async (result) => {
             await setGeminiCache(user.uid, cacheKey, JSON.stringify(result));
             setInsight(result);
@@ -73,7 +73,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
 
       fetchWithCache();
     }
-  }, [homeSpotId, homeForecast, isGuest, sessions, preferredWaveHeight, homeSpot, user]);
+  }, [homeSpotId, homeForecast, isGuest, sessions, preferredWaveHeight, homeSpot, user, quiver]);
 
   const handleSpotSelect = async (spotId: string) => {
     setHomeSpotId(spotId);

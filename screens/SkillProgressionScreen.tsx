@@ -21,7 +21,7 @@ interface SkillProgressionScreenProps {
 }
 
 export const SkillProgressionScreen: React.FC<SkillProgressionScreenProps> = ({ onBack }) => {
-  const { isGuest, sessions, homeSpotId, forecasts, preferredWaveHeight } = useApp();
+  const { isGuest, sessions, homeSpotId, forecasts, preferredWaveHeight, quiver } = useApp();
   const { user } = useAuth();
   const [timeframe, setTimeframe] = useState<'30' | '90' | 'ALL'>('30');
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
@@ -141,7 +141,8 @@ export const SkillProgressionScreen: React.FC<SkillProgressionScreenProps> = ({ 
           homeSpot.breakProfile || {} as any,
           filteredSessions,
           preferredWaveHeight || { min: 0.5, max: 3.0 },
-          { lat: homeSpot.latitude, lng: homeSpot.longitude }
+          { lat: homeSpot.latitude, lng: homeSpot.longitude },
+          quiver
         );
         await setGeminiCache(user.uid, cacheKey, result.summary);
         setAiAnalysis(result.summary);
@@ -154,7 +155,7 @@ export const SkillProgressionScreen: React.FC<SkillProgressionScreenProps> = ({ 
 
     const timeoutId = setTimeout(getCoaching, 800);
     return () => clearTimeout(timeoutId);
-  }, [filteredSessions.length, homeSpotId, timeframe, isGuest, homeSpot, forecasts, preferredWaveHeight, user]);
+  }, [filteredSessions.length, homeSpotId, timeframe, isGuest, homeSpot, forecasts, preferredWaveHeight, user, quiver]);
 
 
   return (
