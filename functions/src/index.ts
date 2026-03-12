@@ -9,11 +9,7 @@ const geminiApiKey = defineSecret('GEMINI_API_KEY');
 
 admin.initializeApp();
 
-async function requireAuth(
-  req: Request,
-  res: Response,
-  next: () => Promise<void>
-): Promise<void> {
+async function requireAuth(req: Request, res: Response, next: () => Promise<void>): Promise<void> {
   const authHeader = req.headers.authorization ?? '';
   const idToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
 
