@@ -20,9 +20,9 @@ import { SignInScreen } from '@/src/screens/SignInScreen';
 import { ForgotPasswordScreen } from '@/src/screens/ForgotPasswordScreen';
 import { EditProfileScreen } from '@/screens/EditProfileScreen';
 import { UserProfileProvider } from '@/src/context/UserProfileContext';
-import { AuthProvider, useAuth } from './src/context/AuthContext';
-import { AppProvider } from './src/context/AppContext';
-import { ToastProvider, useToast } from './src/context/ToastContext';
+import { AuthProvider, useAuth } from '@/src/context/AuthContext';
+import { AppProvider } from '@/src/context/AppContext';
+import { ToastProvider, useToast } from '@/src/context/ToastContext';
 import { setupPushListeners, registerFCMToken } from '@/src/services/fcm';
 
 // ─── Screens that should hide the navigation bar ──────────────────────────────
@@ -44,8 +44,8 @@ const AuthLoadingSplash: React.FC = () => (
   </div>
 );
 
-// ─── Inner App (has access to context) ────────────────────────────────────────
-const AppInner: React.FC = () => {
+// ─── App Content ──────────────────────────────────────────────────────────────
+const AppContent: React.FC = () => {
   const { isLoadingAuth, isGuest, user } = useAuth();
   const [currentScreen, setCurrentScreen] = useState<Screen>(Screen.HOME);
   const [selectedSpot, setSelectedSpot] = useState<SurfSpot | null>(null);
@@ -151,33 +151,39 @@ const AppInner: React.FC = () => {
 
   const showNav = !HIDE_NAV_SCREENS.includes(currentScreen);
 
+  // NOTE: No overflow or scroll property here — the browser window is the scroll root.
+  // This is required for `position: sticky` on headers (e.g. SpotDetailScreen) to work.
+  // Do NOT add overflow-hidden, overflow-auto, or overflow-scroll to this div;
+  // any of those would create a new scroll context and silently break sticky headers.
+  //
+  // Screens audited for scroll/height dependencies (none rely on this div as scroll root):
+  // - LogSessionScreen: uses h-screen only on its empty-state guard div — safe.
+  // - SessionDetailScreen: uses h-screen only on its empty-state guard div — safe.
+  // - SpotDetailScreen: uses h-screen only on its no-spot guard div — safe.
+  // - SignUpScreen: self-manages scroll with its own overflow-y-auto — safe.
+  // - All other screens: min-h-screen only, scroll naturally via the window — safe.
+  return (
+    <div className="max-w-md mx-auto min-h-screen">
+      {renderScreen()}
+
+      {showNav && isGuest && (
+        <GuestBanner onNavigate={navigate} />
+      )}
+
+      {showNav && (
+        <Navigation currentScreen={currentScreen} onNavigate={navigate} />
+      )}
+    </div>
+  );
+};
+
+// ─── Inner App (has access to context) ────────────────────────────────────────
+const AppInner: React.FC = () => {
+  const { isGuest, user } = useAuth();
   return (
     <AppProvider isGuest={isGuest} uid={user?.uid}>
       <ToastProvider>
-        {/*
-          NOTE: No overflow or scroll property here — the browser window is the scroll root.
-          This is required for `position: sticky` on headers (e.g. SpotDetailScreen) to work.
-          Do NOT add overflow-hidden, overflow-auto, or overflow-scroll to this div;
-          any of those would create a new scroll context and silently break sticky headers.
-
-          Screens audited for scroll/height dependencies (none rely on this div as scroll root):
-          - LogSessionScreen: uses h-screen only on its empty-state guard div — safe.
-          - SessionDetailScreen: uses h-screen only on its empty-state guard div — safe.
-          - SpotDetailScreen: uses h-screen only on its no-spot guard div — safe.
-          - SignUpScreen: self-manages scroll with its own overflow-y-auto — safe.
-          - All other screens: min-h-screen only, scroll naturally via the window — safe.
-        */}
-        <div className="max-w-md mx-auto min-h-screen">
-          {renderScreen()}
-
-          {showNav && isGuest && (
-            <GuestBanner onNavigate={navigate} />
-          )}
-
-          {showNav && (
-            <Navigation currentScreen={currentScreen} onNavigate={navigate} />
-          )}
-        </div>
+        <AppContent />
       </ToastProvider>
     </AppProvider>
   );
