@@ -74,6 +74,8 @@ export interface SessionLog {
   timestamp: number;
   conditionsSnapshot?: ConditionsSnapshot;       // kept for backwards compat — snapshot at session midpoint
   conditionsRange?: ConditionsSnapshot[];         // one entry per forecast hour covered by the session window
+  crowdFactor?: number;
+  energyLevel?: number;
 }
 
 // ─── Board (for Quiver) ────────────────────────────────────────────────────────
@@ -98,6 +100,7 @@ export interface UserProfile {
   location: string;
   skillLevel: 'beginner' | 'intermediate' | 'advanced' | 'pro';
   homeBreak: string;
+  homeSpotId?: string;
   unitSystem: 'metric' | 'imperial';
   updatedAt: number;
 }

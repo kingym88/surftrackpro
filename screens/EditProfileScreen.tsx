@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Screen } from '@/types';
 import { useUserProfile } from '@/src/context/UserProfileContext';
+import { PORTUGAL_SPOTS } from '@/src/data/portugalSpots';
 
 interface EditProfileScreenProps {
   onNavigate: (screen: Screen, params?: any) => void;
@@ -16,6 +17,7 @@ export const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ onNavigate
     location: '',
     skillLevel: 'intermediate' as 'beginner' | 'intermediate' | 'advanced' | 'pro',
     homeBreak: '',
+    homeSpotId: '',
   });
 
   useEffect(() => {
@@ -25,6 +27,7 @@ export const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ onNavigate
         location: profile.location || 'Lisbon, PT',
         skillLevel: profile.skillLevel || 'intermediate',
         homeBreak: profile.homeBreak || '',
+        homeSpotId: profile.homeSpotId || '',
       });
     }
   }, [profile]);
@@ -100,14 +103,31 @@ export const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ onNavigate
 
         {/* Home Break */}
         <div className="bg-surface rounded-2xl border border-border p-4">
-          <label className="text-xs font-bold uppercase tracking-widest text-textMuted mb-2 block">Home Break</label>
-          <input 
-            type="text" 
-            className="w-full bg-background border border-border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-sm"
-            value={formState.homeBreak}
-            placeholder="e.g. Carcavelos"
-            onChange={(e) => setFormState({...formState, homeBreak: e.target.value})}
-          />
+          <label className="text-xs font-bold uppercase tracking-widest text-textMuted mb-2 block">
+            Home Break
+          </label>
+          <select
+            className="w-full bg-background border border-border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-sm text-text"
+            value={formState.homeSpotId}
+            onChange={(e) => {
+              const selectedSpot = PORTUGAL_SPOTS.find(s => s.id === e.target.value);
+              setFormState({
+                ...formState,
+                homeSpotId: e.target.value,
+                homeBreak: selectedSpot?.name || '',
+              });
+            }}
+          >
+            <option value="">Select your home break...</option>
+            {PORTUGAL_SPOTS.map(spot => (
+              <option key={spot.id} value={spot.id}>
+                {spot.name}
+              </option>
+            ))}
+          </select>
+          <p className="text-[10px] text-textMuted mt-2">
+            Used by AI Coach to personalise your progression analysis.
+          </p>
         </div>
 
         {/* Skill Level */}

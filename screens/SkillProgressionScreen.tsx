@@ -1,9 +1,10 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useApp } from '@/src/context/AppContext';
 import { getGeminiInsight } from '@/src/services/geminiInsight';
 import { GuestGate } from '@/src/components/GuestGate';
 import { PORTUGAL_SPOTS } from '@/src/data/portugalSpots';
 import { useUnits } from '@/src/hooks/useUnits';
+import { getGeminiCache, setGeminiCache, buildCoachCacheKey } from '@/src/utils/geminiCache';
 import {
   LineChart,
   Line,
@@ -39,30 +40,40 @@ export const SkillProgressionScreen: React.FC<SkillProgressionScreenProps> = ({ 
   // Compute aggregate stats
   const stats = useMemo(() => {
     if (filteredSessions.length === 0) {
-       return { total: 0, topSpeed: 0, avgWaveTime: 0, bestScore: 0 };
+       return { total: 0, waveRate: '--', avgEnergy: '--', avgCrowd: '--', bestScore: 0 };
     }
     const total = filteredSessions.length;
-    const topSpeed = Math.max(...filteredSessions.map(s => s.topSpeed || 0));
-    const totalDuration = filteredSessions.reduce((acc, s) => acc + (s.duration || 0), 0);
-    const avgWaveTime = totalDuration > 0 ? (totalDuration / total) * 0.1 : 0; 
+    
+    const totalWaves = filteredSessions.reduce((acc, s) => acc + (s.waveCount || 0), 0);
+    const totalHours = filteredSessions.reduce((acc, s) => acc + (s.duration || 0), 0) / 60;
+    const waveRate = totalHours > 0 ? (totalWaves / totalHours).toFixed(1) : '--';
+
+    const energySessions = filteredSessions.filter(s => s.energyLevel && s.energyLevel > 0);
+    const avgEnergy = energySessions.length > 0
+      ? (energySessions.reduce((acc, s) => acc + (s.energyLevel || 0), 0) / energySessions.length).toFixed(1)
+      : '--';
+
+    const crowdSessions = filteredSessions.filter(s => s.crowdFactor && s.crowdFactor > 0);
+    const avgCrowd = crowdSessions.length > 0
+      ? (crowdSessions.reduce((acc, s) => acc + (s.crowdFactor || 0), 0) / crowdSessions.length).toFixed(1)
+      : '--';
+      
     const bestScore = Math.max(...filteredSessions.map(s => s.rating));
-    return { 
-        total, 
-        topSpeed: topSpeed > 0 ? topSpeed : '--', 
-        avgWaveTime: avgWaveTime > 0 ? avgWaveTime.toFixed(1) : '--',
-        bestScore 
-    };
+    
+    return { total, waveRate, avgEnergy, avgCrowd, bestScore };
   }, [filteredSessions]);
 
   // 9.1 & 9.2 Compute rolling score
   const skillOverTime = useMemo(() => {
      // Group sessions by date
-     const groupedByDate: Record<string, { ratings: number[], waveHeights: number[], count: number }> = {};
+     const groupedByDate: Record<string, { ratings: number[], waveHeights: number[], energyLevels: number[], crowdFactors: number[], count: number }> = {};
      filteredSessions.forEach(s => {
        const dateStr = new Date(s.timestamp).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
-       if (!groupedByDate[dateStr]) groupedByDate[dateStr] = { ratings: [], waveHeights: [], count: 0 };
+       if (!groupedByDate[dateStr]) groupedByDate[dateStr] = { ratings: [], waveHeights: [], energyLevels: [], crowdFactors: [], count: 0 };
        groupedByDate[dateStr].ratings.push(s.rating);
        groupedByDate[dateStr].waveHeights.push(parseFloat(s.height) || 0);
+       groupedByDate[dateStr].energyLevels.push(s.energyLevel || 3);
+       groupedByDate[dateStr].crowdFactors.push(s.crowdFactor || 3);
        groupedByDate[dateStr].count += 1;
      });
 
@@ -75,9 +86,20 @@ export const SkillProgressionScreen: React.FC<SkillProgressionScreenProps> = ({ 
        const group = groupedByDate[date];
        const avgRating = group.ratings.reduce((a,b) => a+b,0) / group.count; // 1-5
        const maxHt = Math.max(...group.waveHeights); // mostly 0.5 - 3.0
+       const avgEnergy = group.energyLevels?.length > 0
+         ? group.energyLevels.reduce((a: number, b: number) => a + b, 0) / group.energyLevels.length
+         : 3;
+       const avgCrowd = group.crowdFactors?.length > 0
+         ? group.crowdFactors.reduce((a: number, b: number) => a + b, 0) / group.crowdFactors.length
+         : 3;
        
-       // complex formula based on frequency (count), rating, and wave height
-       const bump = (avgRating - 3) * 5 + (maxHt > 1.5 ? 5 : 0) + (group.count > 1 ? 5 : 0);
+       // complex formula based on frequency (count), rating, wave height, energy, and crowd
+       const bump = (avgRating - 3) * 4          // rating contribution
+         + (maxHt > 0.8 ? 3 : 0)                // wave height contribution (lowered from 1.5m)
+         + (group.count > 1 ? 3 : 0)            // frequency bonus
+         + (avgEnergy - 3) * 2                  // energy contribution
+         + (avgCrowd <= 2 ? 2 : 0)              // quiet lineup bonus
+         + 1;                                   // baseline: +1 just for showing up
        rollingScore = Math.min(100, Math.max(0, rollingScore + bump));
        
        result.push({
@@ -90,29 +112,47 @@ export const SkillProgressionScreen: React.FC<SkillProgressionScreenProps> = ({ 
   }, [filteredSessions]);
 
   // 9.3 Fetch AI Coaching
+  const lastCacheKey = useRef<string>('');
+
   useEffect(() => {
-      const getCoaching = async () => {
-         if (filteredSessions.length === 0 || !homeSpotId || !homeSpot || isGuest) return;
-         setIsLoadingAnalysis(true);
-         try {
-              const result = await getGeminiInsight(
-                forecasts[homeSpotId] || [], 
-                homeSpot.breakProfile || {} as any, 
-                filteredSessions, 
-                preferredWaveHeight || { min: 0.5, max: 3.0 },
-                { lat: homeSpot.latitude, lng: homeSpot.longitude }
-              );
-             setAiAnalysis(result.summary);
-         } catch(e) {
-             console.log(e);
-         } finally {
-             setIsLoadingAnalysis(false);
-         }
-      };
-      
-      const timeoutId = setTimeout(getCoaching, 500); // debounce slightly
-      return () => clearTimeout(timeoutId);
-  }, [filteredSessions, homeSpotId, homeSpot, forecasts, preferredWaveHeight, isGuest]);
+    const getCoaching = async () => {
+      if (filteredSessions.length === 0 || !homeSpotId || !homeSpot || isGuest) return;
+
+      const cacheKey = buildCoachCacheKey(homeSpotId, filteredSessions.length, timeframe);
+
+      // Skip if we already loaded this exact cache key this session
+      if (cacheKey === lastCacheKey.current) return;
+      lastCacheKey.current = cacheKey;
+
+      // Check localStorage cache first
+      const cached = getGeminiCache(cacheKey);
+      if (cached) {
+        setAiAnalysis(cached);
+        return;
+      }
+
+      // Cache miss — call Gemini
+      setIsLoadingAnalysis(true);
+      try {
+        const result = await getGeminiInsight(
+          forecasts[homeSpotId] || [],
+          homeSpot.breakProfile || {} as any,
+          filteredSessions,
+          preferredWaveHeight || { min: 0.5, max: 3.0 },
+          { lat: homeSpot.latitude, lng: homeSpot.longitude }
+        );
+        setGeminiCache(cacheKey, result.summary);
+        setAiAnalysis(result.summary);
+      } catch(e) {
+        console.error('Gemini coaching failed:', e);
+      } finally {
+        setIsLoadingAnalysis(false);
+      }
+    };
+
+    const timeoutId = setTimeout(getCoaching, 800);
+    return () => clearTimeout(timeoutId);
+  }, [filteredSessions.length, homeSpotId, timeframe, isGuest, homeSpot, forecasts, preferredWaveHeight]);
 
 
   return (
@@ -166,18 +206,20 @@ export const SkillProgressionScreen: React.FC<SkillProgressionScreenProps> = ({ 
               <span className="text-2xl font-black text-text">{stats.total}</span>
             </div>
             <div className="bg-surface border border-border p-4 rounded-xl shadow-sm">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-textMuted block mb-1">Top Speed</span>
-              <span className="text-2xl font-black text-text">
-                {stats.topSpeed !== '--' ? units.speed(stats.topSpeed as number) : '--'}
-              </span>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-textMuted block mb-1">Wave Rate</span>
+              <span className="text-2xl font-black text-text">{stats.waveRate}<span className="text-xs font-medium text-textMuted ml-1">/hr</span></span>
             </div>
             <div className="bg-surface border border-border p-4 rounded-xl shadow-sm">
               <span className="text-[10px] font-bold uppercase tracking-widest text-textMuted block mb-1">Best Score</span>
               <span className="text-2xl font-black text-primary">{stats.bestScore > 0 ? `${stats.bestScore}/5` : '--'}</span>
             </div>
             <div className="bg-surface border border-border p-4 rounded-xl shadow-sm">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-textMuted block mb-1">Avg Wave</span>
-              <span className="text-2xl font-black text-text">{stats.avgWaveTime}<span className="text-xs font-medium text-textMuted ml-1">sec</span></span>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-textMuted block mb-1">Avg Energy</span>
+              <span className="text-2xl font-black text-amber-400">{stats.avgEnergy !== '--' ? `${stats.avgEnergy}/5` : '--'}</span>
+            </div>
+            <div className="bg-surface border border-border p-4 rounded-xl shadow-sm col-span-2">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-textMuted block mb-1">Avg Crowd</span>
+              <span className="text-2xl font-black text-text">{stats.avgCrowd !== '--' ? `${stats.avgCrowd}/5` : '--'}</span>
             </div>
           </section>
 

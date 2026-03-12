@@ -6,8 +6,23 @@ import { useUnits } from '@/src/hooks/useUnits';
 import { getSpots, getUserProfile, addSession } from '@/src/services/firestore';
 import { fetchOpenMeteoForecast } from '@/src/services/openMeteo';
 import { computeSwellQuality } from '@/src/services/swellQuality';
-import { getGeminiInsight } from '@/src/services/geminiInsight';
+import { PORTUGAL_SPOTS } from '@/src/data/portugalSpots';
+import { getGeminiInsight, getSurfMatchInsights } from '@/src/services/geminiInsight';
+import { getGeminiCache, setGeminiCache } from '@/src/utils/geminiCache';
 import type { SurfSpot, ForecastSnapshot, SwellQualityScore } from '@/types';
+import { Screen } from '@/types';
+
+function getDistanceKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+    Math.cos((lat2 * Math.PI) / 180) *
+    Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
 
 interface MatchResult {
   spot: SurfSpot;
@@ -17,9 +32,13 @@ interface MatchResult {
 
 const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-export const SurfMatchScreen: React.FC = () => {
+interface SurfMatchScreenProps {
+  onNavigate: (screen: Screen, params?: any) => void;
+}
+
+export const SurfMatchScreen: React.FC<SurfMatchScreenProps> = ({ onNavigate }) => {
     const { user } = useAuth();
-    const { spots, tides } = useApp();
+    const { spots, tides, homeSpotId } = useApp();
     const units = useUnits();
 
     const [selectedDayIndex, setSelectedDayIndex] = useState(0);
@@ -27,6 +46,9 @@ export const SurfMatchScreen: React.FC = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [personalInsight, setPersonalInsight] = useState<string | null>(null);
+    const [allDayInsights, setAllDayInsights] = useState<Record<string, string>>({});
+    const [topSpotId, setTopSpotId] = useState<string | null>(null);
+    const [radiusKm, setRadiusKm] = useState<25 | 50 | 100>(25);
 
     // Initialise 7 days starting from today
     const [days] = useState<Date[]>(() => {
@@ -47,7 +69,6 @@ export const SurfMatchScreen: React.FC = () => {
         setIsLoading(true);
         setError(null);
         setMatches([]);
-        setPersonalInsight(null);
 
         try {
             const profile = await getUserProfile(user.uid);
@@ -58,7 +79,23 @@ export const SurfMatchScreen: React.FC = () => {
                 fetchedSpots = spots;
             }
 
-            const targetSpots = fetchedSpots.slice(0, 5); 
+            const homeSpot = PORTUGAL_SPOTS.find(s => s.id === homeSpotId);
+
+            const nearbySpots = homeSpot
+              ? fetchedSpots.filter(s =>
+                  getDistanceKm(
+                    homeSpot.latitude,
+                    homeSpot.longitude,
+                    s.coordinates.lat,
+                    s.coordinates.lng
+                  ) <= radiusKm
+                )
+              : fetchedSpots; // no home spot set — show all spots
+
+            // Use nearby spots filtered by radius; fall back to all if radius returns 0
+            // Hard cap at 10 to prevent excessive forecast API calls
+            const targetSpots = (nearbySpots.length > 0 ? nearbySpots : fetchedSpots).slice(0, 10);
+            
             if (targetSpots.length === 0) {
                 throw new Error('No spots available to verify conditions against.');
             }
@@ -103,14 +140,8 @@ export const SurfMatchScreen: React.FC = () => {
             localSpotRanks.sort((a,b) => b.score.score - a.score.score);
             setMatches(localSpotRanks);
 
-            try {
-                const highestMatchTier = localSpotRanks[0];
-                const genAI = await getGeminiInsight([highestMatchTier.forecast], highestMatchTier.spot.breakProfile, [], userPrefs, highestMatchTier.spot.coordinates);
-                setPersonalInsight(genAI.summary);
-            } catch (aiErr) {
-                console.warn('AI Parsing skipped for offline.', aiErr);
-                setPersonalInsight('AI coach analysis is temporarily delayed today.');
-            }
+            const newTopSpotId = localSpotRanks[0]?.spot.id ?? null;
+            setTopSpotId(prev => prev !== newTopSpotId ? newTopSpotId : prev);
 
         } catch (fatalObj: any) {
             console.error('Core match resolution failed:', fatalObj);
@@ -123,7 +154,53 @@ export const SurfMatchScreen: React.FC = () => {
     useEffect(() => {
         fetchMatches();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [selectedDayIndex, user]);
+    }, [selectedDayIndex, user, radiusKm]);
+
+    useEffect(() => {
+        const loadInsights = async () => {
+            if (!topSpotId || !user) return;
+
+            const today = new Date().toISOString().slice(0, 10);
+            const cacheKey = `surfmatch_insights_${topSpotId}_${today}`;
+
+            // Check cache first
+            const cached = getGeminiCache(cacheKey);
+            if (cached) {
+                setAllDayInsights(JSON.parse(cached));
+                return;
+            }
+
+            // Fetch all 7 days of forecast for the top spot
+            try {
+                const topSpot = spots.find(s => s.id === topSpotId);
+                if (!topSpot) return;
+
+                const profile = await getUserProfile(user.uid);
+                const userPrefs = profile 
+                    ? { min: profile.preferredWaveHeightMin, max: profile.preferredWaveHeightMax } 
+                    : undefined;
+
+                const fullForecasts = await fetchOpenMeteoForecast(
+                    topSpot.coordinates.lat, 
+                    topSpot.coordinates.lng
+                );
+
+                const insights = await getSurfMatchInsights(
+                    fullForecasts,
+                    topSpot.breakProfile,
+                    userPrefs,
+                    topSpot.coordinates
+                );
+
+                setGeminiCache(cacheKey, JSON.stringify(insights));
+                setAllDayInsights(insights);
+            } catch(e) {
+                console.warn('Surf match insights failed:', e);
+            }
+        };
+
+        loadInsights();
+    }, [topSpotId]);
 
     // -- Handlers -- 
     const handleBookmarkCondition = async (matchPayload: MatchResult, bookmarkFormat: 'history' | 'wishlist') => {
@@ -144,7 +221,7 @@ export const SurfMatchScreen: React.FC = () => {
                     windSpeed: matchPayload.forecast.windSpeed,
                     windDirection: matchPayload.forecast.windDirection,
                     tide: 0,
-                }
+                } as any
             });
             alert('Condition archived to your progression timeline.');
         } catch(e) {
@@ -176,6 +253,36 @@ export const SurfMatchScreen: React.FC = () => {
                     <div>
                         <p className="text-xs font-bold uppercase tracking-widest text-primary/80">Tailored Forecast</p>
                         <h1 className="text-3xl font-bold tracking-tight text-text">Surf Match</h1>
+                        
+                        <div className="flex items-center gap-2 mt-2 flex-wrap">
+                          <span className="material-icons-round text-textMuted text-sm">my_location</span>
+                          {homeSpotId ? (
+                            <>
+                              <span className="text-xs text-textMuted font-medium">Within</span>
+                              {([25, 50, 100] as const).map(r => (
+                                <button
+                                  key={r}
+                                  onClick={() => setRadiusKm(r)}
+                                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase 
+                                    transition-colors ${
+                                      radiusKm === r
+                                        ? 'bg-primary text-white'
+                                        : 'bg-surface border border-border text-textMuted hover:border-primary/40'
+                                    }`}
+                                >
+                                  {r}km
+                                </button>
+                              ))}
+                            </>
+                          ) : (
+                            <button
+                              onClick={() => onNavigate(Screen.EDIT_PROFILE)}
+                              className="text-[10px] text-primary font-bold underline underline-offset-2"
+                            >
+                              Set home break for local matches
+                            </button>
+                          )}
+                        </div>
                     </div>
                 </div>
             </header>
@@ -243,6 +350,22 @@ export const SurfMatchScreen: React.FC = () => {
                                                 <span className="material-icons-round text-xs">location_on</span>
                                                 {match.spot.name}
                                             </p>
+                                            {homeSpotId && (() => {
+                                              const homeSpot = PORTUGAL_SPOTS.find(s => s.id === homeSpotId);
+                                              if (!homeSpot) return null;
+                                              const dist = getDistanceKm(
+                                                homeSpot.latitude,
+                                                homeSpot.longitude,
+                                                match.spot.coordinates.lat,
+                                                match.spot.coordinates.lng
+                                              );
+                                              return (
+                                                <p className="text-[10px] text-textMuted font-medium mt-0.5 flex items-center gap-0.5">
+                                                  <span className="material-icons-round text-[10px]">near_me</span>
+                                                  {dist.toFixed(0)}km away
+                                                </p>
+                                              );
+                                            })()}
                                             <p className="text-xs font-medium text-primary mt-1">{getWindowLabel(match.forecast.forecastHour)}</p>
                                         </div>
                                     </div>
@@ -306,17 +429,21 @@ export const SurfMatchScreen: React.FC = () => {
                                     </div>
                                     <h4 className="text-lg font-bold mb-3 text-white">AI Coach</h4>
                                     
-                                    {personalInsight === null ? (
-                                        <div className="animate-pulse space-y-2 mb-2">
-                                            <div className="h-3 bg-white/30 rounded w-full"></div>
-                                            <div className="h-3 bg-white/30 rounded w-5/6"></div>
-                                            <div className="h-3 bg-white/30 rounded w-4/6"></div>
-                                        </div>
-                                    ) : (
-                                        <p className="text-sm opacity-95 leading-relaxed font-medium">
-                                            {personalInsight}
-                                        </p>
-                                    )}
+                                    {(() => {
+                                        const activeDatePrefix = days[selectedDayIndex].toISOString().slice(0, 10);
+                                        const todayInsight = allDayInsights[activeDatePrefix] ?? null;
+                                        
+                                        return todayInsight === null ? (
+                                            <div className="animate-pulse space-y-2 mb-2">
+                                                <div className="h-3 bg-white/30 rounded w-full"></div>
+                                                <div className="h-3 bg-white/30 rounded w-5/6"></div>
+                                            </div>
+                                        ) : (
+                                            <p className="text-sm opacity-95 leading-relaxed font-medium">
+                                                {todayInsight}
+                                            </p>
+                                        );
+                                    })()}
                                 </div>
                             </div>
                         )}

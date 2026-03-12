@@ -4,19 +4,17 @@ import type { SessionLog, ForecastSnapshot } from '../types';
 import { useApp } from '@/src/context/AppContext';
 import { useUnits } from '@/src/hooks/useUnits';
 import { GuestGate } from '@/src/components/GuestGate';
-import { getGeminiInsight } from '@/src/services/geminiInsight';
 import { fetchOpenMeteoForecast } from '@/src/services/openMeteo';
 
 interface SessionDetailScreenProps {
   session: SessionLog | null;
   onBack: () => void;
+  onNavigate: (screen: Screen, params?: any) => void;
 }
 
-export const SessionDetailScreen: React.FC<SessionDetailScreenProps> = ({ session, onBack }) => {
+export const SessionDetailScreen: React.FC<SessionDetailScreenProps> = ({ session, onBack, onNavigate }) => {
   const { spots, quiver, forecasts, preferredWaveHeight } = useApp();
   const units = useUnits();
-  const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
-  const [isLoadingAnalysis, setIsLoadingAnalysis] = useState(false);
   const [nearestForecast, setNearestForecast] = useState<ForecastSnapshot | null>(null);
 
   const spot = spots.find(s => s.id === session?.spotId);
@@ -48,28 +46,6 @@ export const SessionDetailScreen: React.FC<SessionDetailScreenProps> = ({ sessio
     fetchForecast();
   }, [session, spot, forecasts]);
 
-  useEffect(() => {
-     const generateAnalysis = async () => {
-        if (!session || !nearestForecast) return;
-        setIsLoadingAnalysis(true);
-        try {
-           const breakProfile = spot?.breakProfile || { breakType: 'beach', facingDirection: 'W', optimalSwellDirection: 'W-NW', optimalTidePhase: 'mid', optimalWindDirection: 'E-NE' } as any;
-           const result = await getGeminiInsight(
-             [nearestForecast], 
-             breakProfile, 
-             [session], 
-             preferredWaveHeight || { min: 0.5, max: 3.0 },
-             spot?.coordinates
-           );
-           setAiAnalysis(result.summary);
-        } catch (e) {
-           console.error("AI analysis failed", e);
-        } finally {
-           setIsLoadingAnalysis(false);
-        }
-     };
-     generateAnalysis();
-  }, [session, nearestForecast, spot, preferredWaveHeight]);
 
   if (!session) return (
     <div className="flex-1 flex flex-col items-center justify-center p-8 h-screen bg-background">
@@ -142,6 +118,30 @@ export const SessionDetailScreen: React.FC<SessionDetailScreenProps> = ({ sessio
                     </div>
                  </div>
              </div>
+             {(session.crowdFactor || session.energyLevel) && (
+               <div className="grid grid-cols-2 gap-4 mt-4">
+                 {session.crowdFactor && (
+                   <div className="bg-background rounded-xl p-3 border border-border">
+                     <p className="text-[10px] font-bold text-slate-500 uppercase mb-1">CROWD</p>
+                     <div className="flex gap-0.5 mt-1">
+                        {[1, 2, 3, 4, 5].map(level => (
+                          <span key={level} className={`material-icons-round text-lg ${level <= session.crowdFactor! ? 'text-primary' : 'text-slate-400'}`}>group</span>
+                        ))}
+                     </div>
+                   </div>
+                 )}
+                 {session.energyLevel && (
+                   <div className="bg-background rounded-xl p-3 border border-border">
+                     <p className="text-[10px] font-bold text-slate-500 uppercase mb-1">ENERGY</p>
+                     <div className="flex gap-0.5 mt-1">
+                        {[1, 2, 3, 4, 5].map(level => (
+                          <span key={level} className={`material-icons-round text-lg ${level <= session.energyLevel! ? 'text-amber-400' : 'text-slate-400'}`}>bolt</span>
+                        ))}
+                     </div>
+                   </div>
+                 )}
+               </div>
+             )}
           </section>
         )}
 
@@ -160,21 +160,20 @@ export const SessionDetailScreen: React.FC<SessionDetailScreenProps> = ({ sessio
 
         <GuestGate featureName="AI Post-Session Coaching">
           <section className="bg-primary/10 border border-primary/20 rounded-2xl p-5">
-              <h3 className="text-xs font-bold text-primary uppercase tracking-widest mb-3 flex items-center gap-2">
-                  <span className="material-icons-round text-primary text-sm">smart_toy</span> AI Coach:
-              </h3>
-              {isLoadingAnalysis ? (
-                 <div className="flex items-center gap-3 animate-pulse opacity-60">
-                     <span className="material-icons-round animate-spin text-primary">sync</span>
-                     <p className="text-sm font-medium text-textMuted">Analyzing conditions & performance...</p>
-                 </div>
-              ) : aiAnalysis ? (
-                 <p className="text-sm text-text leading-relaxed font-medium bg-background/50 p-4 rounded-xl border border-primary/10">
-                    {aiAnalysis}
-                 </p>
-              ) : (
-                 <p className="text-sm text-textMuted italic">No AI analysis available for this session.</p>
-              )}
+            <h3 className="text-xs font-bold text-primary uppercase tracking-widest mb-3 flex items-center gap-2">
+              <span className="material-icons-round text-primary text-sm">smart_toy</span>
+              AI Coach
+            </h3>
+            <p className="text-sm text-textMuted leading-relaxed">
+              Your personalised coaching analysis updates automatically after each session.
+              View your full AI breakdown in{' '}
+              <button
+                onClick={() => onNavigate(Screen.SKILL_PROGRESSION)}
+                className="text-primary font-bold underline underline-offset-2"
+              >
+                Skill Progression
+              </button>.
+            </p>
           </section>
         </GuestGate>
 

@@ -98,6 +98,8 @@ export const LogSessionScreen: React.FC<LogSessionScreenProps> = ({ onNavigate }
   const [selectedBoardId, setSelectedBoardId] = useState<string>('');
   const [durationHours, setDurationHours] = useState(1.5);
   const [notes, setNotes] = useState('');
+  const [crowdFactor, setCrowdFactor] = useState(3);
+  const [energyLevel, setEnergyLevel] = useState(3);
   
   // Auto-filled conditions state
   const [waveHeight, setWaveHeight] = useState('');
@@ -164,6 +166,8 @@ export const LogSessionScreen: React.FC<LogSessionScreenProps> = ({ onNavigate }
       notes,
       conditionsSnapshot: matchedForecast ? buildConditionsSnapshot(matchedForecast, matchedTide, midpointISO) : undefined,
       conditionsRange,
+      crowdFactor,
+      energyLevel,
     };
 
     if (user?.uid) {
@@ -379,6 +383,36 @@ export const LogSessionScreen: React.FC<LogSessionScreenProps> = ({ onNavigate }
                <div className="flex justify-between text-[10px] text-textMuted mt-2 font-bold">
                  <span>30m</span>
                  <span>4h</span>
+               </div>
+             </section>
+
+             {/* Crowd Factor */}
+             <section className="mb-8">
+               <h2 className="text-[10px] font-bold uppercase tracking-widest text-textMuted mb-2">Crowd Factor</h2>
+               <p className="text-xs text-textMuted mb-4">1 = empty lineup, 5 = packed</p>
+               <div className="bg-surface border border-border p-6 rounded-xl flex flex-col items-center gap-4">
+                 <div className="flex gap-2">
+                   {[1, 2, 3, 4, 5].map((level) => (
+                     <button key={`crowd-${level}`} onClick={() => setCrowdFactor(level)} className={`text-4xl material-icons-round transition-all hover:scale-110 ${level <= crowdFactor ? 'text-primary' : 'text-slate-400'}`}>
+                       group
+                     </button>
+                   ))}
+                 </div>
+               </div>
+             </section>
+
+             {/* Energy Level */}
+             <section className="mb-8">
+               <h2 className="text-[10px] font-bold uppercase tracking-widest text-textMuted mb-2">Energy Level</h2>
+               <p className="text-xs text-textMuted mb-4">1 = exhausted, 5 = firing on all cylinders</p>
+               <div className="bg-surface border border-border p-6 rounded-xl flex flex-col items-center gap-4">
+                 <div className="flex gap-2">
+                   {[1, 2, 3, 4, 5].map((level) => (
+                     <button key={`energy-${level}`} onClick={() => setEnergyLevel(level)} className={`text-4xl material-icons-round transition-all hover:scale-110 ${level <= energyLevel ? 'text-amber-400' : 'text-slate-400'}`}>
+                       bolt
+                     </button>
+                   ))}
+                 </div>
                </div>
              </section>
 

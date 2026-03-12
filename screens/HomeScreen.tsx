@@ -14,6 +14,7 @@ import { getGeminiInsight } from '@/src/services/geminiInsight';
 import * as SunCalc from 'suncalc';
 import { useUnits } from '@/src/hooks/useUnits';
 import type { GeminiInsight } from '@/types';
+import { getGeminiCache, setGeminiCache, buildHomeCacheKey } from '@/src/utils/geminiCache';
 
 interface HomeScreenProps {
   onNavigate: (screen: Screen, params?: any) => void;
@@ -47,11 +48,22 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
 
   useEffect(() => {
     if (homeSpotId && homeForecast && !isGuest && homeSpot) {
+      const cacheKey = buildHomeCacheKey(homeSpotId);
+      const cached = getGeminiCache(cacheKey);
+
+      if (cached) {
+        setInsight(JSON.parse(cached));
+        return;
+      }
+
       setLoadingInsight(true);
       const breakProfile = homeSpot.breakProfile;
 
       getGeminiInsight(homeForecast, breakProfile, sessions, preferredWaveHeight || { min: 0.5, max: 3.0 }, { lat: homeSpot.latitude, lng: homeSpot.longitude })
-        .then(setInsight)
+        .then((result) => {
+          setGeminiCache(cacheKey, JSON.stringify(result));
+          setInsight(result);
+        })
         .catch(console.error)
         .finally(() => setLoadingInsight(false));
     }

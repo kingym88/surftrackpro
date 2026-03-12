@@ -64,6 +64,85 @@ export async function getGeminiInsight(
   }
 }
 
+export async function getSurfMatchInsights(
+  allForecasts: ForecastSnapshot[],
+  breakProfile: SpotBreakProfile,
+  userPrefs?: { min: number; max: number },
+  coords?: { lat: number; lng: number },
+): Promise<Record<string, string>> {
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY ?? process.env.GEMINI_API_KEY;
+  if (!apiKey || apiKey === 'PLACEHOLDER_GEMINI_API_KEY') {
+    return {};
+  }
+
+  // Group forecasts by date
+  const byDate: Record<string, ForecastSnapshot[]> = {};
+  allForecasts.forEach(f => {
+    const date = f.forecastHour.slice(0, 10);
+    if (!byDate[date]) byDate[date] = [];
+    byDate[date].push(f);
+  });
+
+  const dates = Object.keys(byDate).sort().slice(0, 7);
+
+  // Build a compact per-day summary for the prompt
+  const daySummaries = dates.map(date => {
+    const snaps = byDate[date];
+    const best = snaps.reduce((a, b) => (b.waveHeight > a.waveHeight ? b : a));
+    return `${date}: waves ${best.waveHeight.toFixed(1)}m @ ${best.wavePeriod.toFixed(0)}s, ` +
+      `wind ${best.windSpeed.toFixed(0)}km/h from ${best.windDirection}°, ` +
+      `swell from ${best.swellDirection}°`;
+  }).join('\n');
+
+  const wavePreference = userPrefs
+    ? `Surfer prefers waves between ${userPrefs.min}m and ${userPrefs.max}m.`
+    : 'No specific wave height preference.';
+
+  const prompt = `You are an expert surf coach. A surfer is viewing a 7-day forecast 
+for a ${breakProfile.breakType} break facing ${breakProfile.facingDirection}, 
+optimal swell from ${breakProfile.optimalSwellDirection}, 
+best tide: ${breakProfile.optimalTidePhase}, 
+offshore wind: ${breakProfile.optimalWindDirection}.
+
+${wavePreference}
+
+7-DAY FORECAST:
+${daySummaries}
+
+Write a SHORT 1-sentence coaching insight for each day (friendly surfer language, 
+max 20 words per day). Only reference what the data shows.
+
+Respond ONLY with valid JSON in this exact format (no markdown, no extra text):
+{
+  "YYYY-MM-DD": "one sentence insight",
+  "YYYY-MM-DD": "one sentence insight"
+}`;
+
+  const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: {
+        responseMimeType: 'application/json',
+        temperature: 0.6,
+        maxOutputTokens: 512,
+      },
+    }),
+  });
+
+  if (!response.ok) return {};
+
+  const data = await response.json();
+  const rawText: string = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? '{}';
+
+  try {
+    return JSON.parse(rawText) as Record<string, string>;
+  } catch {
+    return {};
+  }
+}
+
 // ─── Prompt builder ───────────────────────────────────────────────────────────
 function buildPrompt(
   forecast: ForecastSnapshot[],
@@ -91,9 +170,10 @@ function buildPrompt(
     history.length > 0
       ? history
           .slice(0, 5)
-          .map(
-            s =>
-              `${s.date}: ${s.spotName}, ${s.height}, rating ${s.rating}/5${s.notes ? `, notes: "${s.notes}"` : ''}`,
+          .map(s =>
+            `${s.date}: ${s.spotName}, ${s.height}, rating ${s.rating}/5, ` +
+            `energy ${s.energyLevel ?? 'N/A'}/5, crowd ${s.crowdFactor ?? 'N/A'}/5` +
+            `${s.notes ? `, notes: "${s.notes}"` : ''}`
           )
           .join('\n')
       : 'No previous sessions logged.';
@@ -128,6 +208,13 @@ TASK: Analyse the forecast data and identify the best 1–3 session windows in t
 5. Surfer's preferred wave height range
 6. Pattern comparison with past sessions
 7. Only recommend session windows during daylight hours (between sunrise and sunset). Do not suggest pre-dawn or post-sunset sessions.
+8. Factor in the surfer's energy levels from past sessions. If recent sessions 
+show consistently low energy (1–2), recommend rest before the next swell. If 
+energy is high (4–5), they are ready to tackle bigger or more challenging windows.
+
+9. Factor in crowd data from past sessions. If the surfer consistently logs high 
+crowd scores (4–5) at their home spot, prioritise early morning session windows 
+(within 1–2 hours of sunrise) to help them find emptier lineups.
 
 Respond ONLY with valid JSON in this exact format (no markdown, no extra text):
 {

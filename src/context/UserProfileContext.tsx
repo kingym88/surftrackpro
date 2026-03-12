@@ -57,6 +57,7 @@ export const UserProfileProvider: React.FC<{ children: React.ReactNode }> = ({ c
           location: 'Lisbon, PT',
           skillLevel: 'intermediate',
           homeBreak: '',
+          homeSpotId: '',
           unitSystem: 'metric'
         }),
         ...patch,

@@ -80,7 +80,7 @@ const AppInner: React.FC = () => {
         );
 
       case Screen.SURF_MATCH:
-        return <SurfMatchScreen />;
+        return <SurfMatchScreen onNavigate={navigate} />;
 
       case Screen.QUIVER:
         return <QuiverScreen onNavigate={navigate} />;
@@ -110,6 +110,7 @@ const AppInner: React.FC = () => {
         return (
           <SessionDetailScreen
             onBack={() => navigate(Screen.PROFILE)}
+            onNavigate={navigate}
             session={selectedSession}
           />
         );
