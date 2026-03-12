@@ -1,6 +1,7 @@
 import * as SunCalc from 'suncalc';
 import { Timestamp } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
+import { app } from '@/src/firebase';
 import type { ForecastSnapshot, SpotBreakProfile, SessionLog, GeminiInsight, ConditionsSnapshot, Board } from '@/types';
 
 const GEMINI_API_URL =
@@ -18,7 +19,7 @@ export async function getGeminiInsight(
   const prompt = buildPrompt(forecast, profile, history, preferredWaveHeight, coords, quiver);
 
   try {
-    const functions = getFunctions();
+    const functions = getFunctions(app);
     const callGemini = httpsCallable<{ prompt: string; temperature: number; maxOutputTokens: number }, { text: string }>(functions, 'callGemini');
     
     const result = await callGemini({ 
@@ -103,7 +104,7 @@ Example format:
 }`;
 
   try {
-    const functions = getFunctions();
+    const functions = getFunctions(app);
     const callGemini = httpsCallable<{ prompt: string; temperature: number; maxOutputTokens: number }, { text: string }>(functions, 'callGemini');
     
     const result = await callGemini({ 
@@ -301,7 +302,7 @@ Do not add quotes around the note.
 Respond ONLY with valid JSON: { "note": "your draft note here" }`;
 
   try {
-    const functions = getFunctions();
+    const functions = getFunctions(app);
     const callGemini = httpsCallable<{ prompt: string; temperature: number; maxOutputTokens: number }, { text: string }>(functions, 'callGemini');
     const result = await callGemini({ prompt, temperature: 0.8, maxOutputTokens: 256 });
     const parsed = JSON.parse(result.data.text);
@@ -353,7 +354,7 @@ Use plain surfer language — honest, direct, not patronising.
 Respond ONLY with valid JSON: { "analysis": "your coaching analysis here" }`;
 
   try {
-    const functions = getFunctions();
+    const functions = getFunctions(app);
     const callGemini = httpsCallable<{ prompt: string; temperature: number; maxOutputTokens: number }, { text: string }>(functions, 'callGemini');
     const result = await callGemini({ prompt, temperature: 0.7, maxOutputTokens: 512 });
     const parsed = JSON.parse(result.data.text);
