@@ -42,7 +42,6 @@ export async function getGeminiInsight(
   quiver?: Board[],
 ): Promise<GeminiInsight> {
 
-  // Build only the data summaries — no prompt text
   const daylightForecast = forecast.filter(f => {
     const date = new Date(f.forecastHour);
     const sun = SunCalc.getTimes(date, coords.lat, coords.lng);
@@ -107,7 +106,13 @@ export async function getGeminiInsight(
         detectedPatternsText,
       }
     });
-    const jsonStr = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+
+    console.log('🔍 Raw Gemini response:', rawText);         // ← ADDED
+    const match = rawText.match(/\{[\s\S]*\}/);
+    if (!match) throw new Error('No JSON object found in Gemini response');
+    const jsonStr = match[0];
+    console.log('🔍 Extracted JSON:', jsonStr);              // ← ADDED
+
     return sanitiseInsight(JSON.parse(jsonStr));
   } catch (err) {
     console.error('Gemini insight fetch failed', err);
@@ -156,8 +161,9 @@ export async function getSurfMatchInsights(
         userPrefs: userPrefs ? `${userPrefs.min}m - ${userPrefs.max}m wave height` : 'No preference set.',
       }
     });
-    const jsonStr = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
-    return JSON.parse(jsonStr);
+    const match = rawText.match(/\{[\s\S]*\}/);
+    if (!match) throw new Error('No JSON found');
+    return JSON.parse(match[0]);
   } catch (err) {
     console.error('SurfMatch Gemini insight fetch failed', err);
     return {};
@@ -188,7 +194,9 @@ export async function getSessionNoteDraft(
         board: board ? `${board.brand} ${board.model} ${board.volume}L (${board.boardType})` : null,
       }
     });
-    const parsed = JSON.parse(rawText);
+    const match = rawText.match(/\{[\s\S]*\}/);
+    if (!match) return '';
+    const parsed = JSON.parse(match[0]);
     return parsed.note ?? '';
   } catch {
     return '';
@@ -219,7 +227,9 @@ export async function getSkillCoachAnalysis(
       type: 'SKILL_COACH',
       payload: { homeSpotName, timeframe, sessionSummary, trend }
     });
-    const parsed = JSON.parse(rawText);
+    const match = rawText.match(/\{[\s\S]*\}/);
+    if (!match) return '';
+    const parsed = JSON.parse(match[0]);
     return parsed.analysis ?? '';
   } catch {
     return '';
