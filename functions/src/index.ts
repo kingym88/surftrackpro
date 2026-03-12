@@ -5,7 +5,11 @@ import { callGeminiRaw } from './geminiHelper';
 
 admin.initializeApp();
 
-export const callGemini = onCall(async (request) => {
+export const callGemini = onCall(
+  {
+    cors: ['https://surftrack-pro.web.app', 'http://localhost:5173'],
+  },
+  async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Must be signed in.');
   }

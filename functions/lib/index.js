@@ -29,7 +29,9 @@ const scheduler_1 = require("firebase-functions/v2/scheduler");
 const https_1 = require("firebase-functions/v2/https");
 const geminiHelper_1 = require("./geminiHelper");
 admin.initializeApp();
-exports.callGemini = (0, https_1.onCall)(async (request) => {
+exports.callGemini = (0, https_1.onCall)({
+    cors: ['https://surftrack-pro.web.app', 'http://localhost:5173'],
+}, async (request) => {
     if (!request.auth) {
         throw new https_1.HttpsError('unauthenticated', 'Must be signed in.');
     }
