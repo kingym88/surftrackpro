@@ -1,13 +1,29 @@
 import * as SunCalc from 'suncalc';
-import { getFunctions, httpsCallable } from 'firebase/functions';
-import { app } from '@/src/firebase';
 import type { ForecastSnapshot, SpotBreakProfile, SessionLog, GeminiInsight, ConditionsSnapshot, Board } from '@/types';
 
 const isDev = import.meta.env.DEV;
 
-function getCallable<T, R>(name: string) {
-  const functions = getFunctions(app);
-  return httpsCallable<T, { text: string }>(functions, name);
+async function callGemini(data: { type: string; payload: Record<string, any> }): Promise<string> {
+  const { getAuth } = await import('firebase/auth');
+  const { app } = await import('@/src/firebase');
+  const auth = getAuth(app);
+  const user = auth.currentUser;
+  if (!user) throw new Error('Not authenticated');
+  
+  const token = await user.getIdToken();
+  
+  const response = await fetch('/api/callGemini', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify({ data }),
+  });
+  
+  if (!response.ok) throw new Error(`Function error: ${response.status}`);
+  const json = await response.json();
+  return json.result.text;
 }
 
 export async function getGeminiInsight(
@@ -69,8 +85,7 @@ export async function getGeminiInsight(
   }
 
   try {
-    const callGemini = getCallable('callGemini');
-    const result = await callGemini({
+    const rawText = await callGemini({
       type: 'SPOT_ANALYSIS',
       payload: {
         breakType: profile.breakType,
@@ -85,7 +100,7 @@ export async function getGeminiInsight(
         detectedPatternsText,
       }
     });
-    const jsonStr = result.data.text.replace(/```json/g, '').replace(/```/g, '').trim();
+    const jsonStr = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
     return sanitiseInsight(JSON.parse(jsonStr));
   } catch (err) {
     console.error('Gemini insight fetch failed', err);
@@ -125,8 +140,7 @@ export async function getSurfMatchInsights(
   }).join('\n');
 
   try {
-    const callGemini = getCallable('callGemini');
-    const result = await callGemini({
+    const rawText = await callGemini({
       type: 'SURF_MATCH',
       payload: {
         optimalSwellDirection: breakProfile.optimalSwellDirection,
@@ -135,7 +149,7 @@ export async function getSurfMatchInsights(
         userPrefs: userPrefs ? `${userPrefs.min}m - ${userPrefs.max}m wave height` : 'No preference set.',
       }
     });
-    const jsonStr = result.data.text.replace(/```json/g, '').replace(/```/g, '').trim();
+    const jsonStr = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
     return JSON.parse(jsonStr);
   } catch (err) {
     console.error('SurfMatch Gemini insight fetch failed', err);
@@ -152,8 +166,7 @@ export async function getSessionNoteDraft(
   spotName: string,
 ): Promise<string> {
   try {
-    const callGemini = getCallable('callGemini');
-    const result = await callGemini({
+    const rawText = await callGemini({
       type: 'SESSION_NOTE',
       payload: {
         spotName,
@@ -168,7 +181,7 @@ export async function getSessionNoteDraft(
         board: board ? `${board.brand} ${board.model} ${board.volume}L (${board.boardType})` : null,
       }
     });
-    const parsed = JSON.parse(result.data.text);
+    const parsed = JSON.parse(rawText);
     return parsed.note ?? '';
   } catch {
     return '';
@@ -195,12 +208,11 @@ export async function getSkillCoachAnalysis(
   const trend = last > first + 0.4 ? 'improving' : last < first - 0.4 ? 'declining' : 'consistent';
 
   try {
-    const callGemini = getCallable('callGemini');
-    const result = await callGemini({
+    const rawText = await callGemini({
       type: 'SKILL_COACH',
       payload: { homeSpotName, timeframe, sessionSummary, trend }
     });
-    const parsed = JSON.parse(result.data.text);
+    const parsed = JSON.parse(rawText);
     return parsed.analysis ?? '';
   } catch {
     return '';
