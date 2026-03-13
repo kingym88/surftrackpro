@@ -40,6 +40,8 @@ export async function getGeminiInsight(
   preferredWaveHeight: { min: number; max: number } | undefined,
   coords: { lat: number; lng: number },
   quiver?: Board[],
+  spotName?: string,
+  insightType?: string,
 ): Promise<GeminiInsight> {
 
   const now = new Date(); // ← ADDED
@@ -95,7 +97,7 @@ export async function getGeminiInsight(
 
   try {
     const rawText = await callGemini({
-      type: 'SPOT_ANALYSIS',
+      type: insightType ?? 'SPOT_ANALYSIS',
       payload: {
         breakType: profile.breakType,
         facingDirection: profile.facingDirection,
@@ -107,6 +109,7 @@ export async function getGeminiInsight(
         historyText,
         boardsUsedText,
         detectedPatternsText,
+        spotName: spotName ?? 'this spot',
       }
     });
 
@@ -116,6 +119,51 @@ export async function getGeminiInsight(
   } catch (err) {
     console.error('Gemini insight fetch failed', err);
     return getFallbackInsight();
+  }
+}
+
+export async function getHeroInsight(
+  forecast: ForecastSnapshot[],
+  spotName: string,
+  coords: { lat: number; lng: number },
+): Promise<string> {
+  const now = new Date();
+
+  // Current snapshot = closest to now
+  const currentSnap = forecast.reduce((closest, snap) => {
+    const diff = Math.abs(new Date(snap.forecastHour).getTime() - now.getTime());
+    const closestDiff = Math.abs(new Date(closest.forecastHour).getTime() - now.getTime());
+    return diff < closestDiff ? snap : closest;
+  }, forecast[0]);
+
+  // Next 6 hours
+  const next6h = forecast
+    .filter(f => {
+      const t = new Date(f.forecastHour).getTime();
+      return t > now.getTime() && t <= now.getTime() + 6 * 60 * 60 * 1000;
+    })
+    .map(f =>
+      `${f.forecastHour}: ${f.waveHeight.toFixed(1)}m @ ${f.wavePeriod.toFixed(0)}s, ` +
+      `wind ${f.windSpeed.toFixed(0)}km/h from ${f.windDirection}°`
+    )
+    .join('\n');
+
+  const currentSnapText =
+    `${currentSnap.forecastHour}: ${currentSnap.waveHeight.toFixed(1)}m @ ` +
+    `${currentSnap.wavePeriod.toFixed(0)}s, wind ${currentSnap.windSpeed.toFixed(0)}km/h ` +
+    `from ${currentSnap.windDirection}°, swell from ${currentSnap.swellDirection}°`;
+
+  try {
+    const rawText = await callGemini({
+      type: 'HERO_SNAP',
+      payload: { spotName, currentSnap: currentSnapText, next6h },
+    });
+    const match = rawText.match(/\{[\s\S]*\}/);
+    if (!match) return '';
+    const parsed = JSON.parse(match[0]);
+    return parsed.summary ?? '';
+  } catch {
+    return '';
   }
 }
 
@@ -222,9 +270,23 @@ export async function getSkillCoachAnalysis(
   const trend = last > first + 0.4 ? 'improving' : last < first - 0.4 ? 'declining' : 'consistent';
 
   try {
+    let tidePatternText = '';
+    if (sessions.length >= 3) {
+      const tideRatings: Record<string, number[]> = {};
+      sessions.forEach(s => {
+        const tideType = s.conditionsSnapshot?.tideType ?? 'UNKNOWN';
+        if (!tideRatings[tideType]) tideRatings[tideType] = [];
+        tideRatings[tideType].push(s.rating);
+      });
+      tidePatternText = Object.entries(tideRatings).map(([tide, ratings]) => {
+        const avg = (ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(1);
+        return `${tide} tide: avg rating ${avg}/5 (${ratings.length} sessions)`;
+      }).join(', ');
+    }
+
     const rawText = await callGemini({
       type: 'SKILL_COACH',
-      payload: { homeSpotName, timeframe, sessionSummary, trend }
+      payload: { homeSpotName, timeframe, sessionSummary, trend, tidePatternText }
     });
     const match = rawText.match(/\{[\s\S]*\}/);
     if (!match) return '';

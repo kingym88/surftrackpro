@@ -119,7 +119,7 @@ export const SpotDetailScreen: React.FC<SpotDetailScreenProps> = ({ onNavigate, 
       
       const fetchWithCache = async () => {
         const today = new Date().toISOString().slice(0, 10);
-        const cacheKey = `spot_analysis_${spot.id}_${today}`;
+        const cacheKey = `spot_deep_${spot.id}_${today}`;
         
         const cached = await getGeminiCache(user.uid, cacheKey);
         if (cached) {
@@ -135,7 +135,9 @@ export const SpotDetailScreen: React.FC<SpotDetailScreenProps> = ({ onNavigate, 
             sessions, 
             preferredWaveHeight || { min: 0.5, max: 3.0 }, 
             spot.coordinates,
-            quiver
+            quiver,
+            spot.name,
+            'SPOT_ANALYSIS_DEEP'
           );
           await setGeminiCache(user.uid, cacheKey, JSON.stringify(result));
           setInsight(result);

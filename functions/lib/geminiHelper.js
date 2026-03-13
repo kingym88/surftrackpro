@@ -1,12 +1,13 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.callGeminiRaw = void 0;
-async function callGeminiRaw(prompt, temperature = 0.7, maxOutputTokens = 1024) {
+async function callGeminiRaw(prompt, temperature = 0.7, maxOutputTokens = 2048) {
     var _a, _b, _c, _d;
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey)
         throw new Error('GEMINI_API_KEY not set');
-    const url = `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+    // 1. CHANGED to v1beta to support Gemini 2.5 Flash features
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
     const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -15,7 +16,12 @@ async function callGeminiRaw(prompt, temperature = 0.7, maxOutputTokens = 1024) 
             generationConfig: {
                 temperature,
                 maxOutputTokens,
-                // Adding a stop sequence or topP here is often helpful for 2.0 models
+                // 2. CHANGED to camelCase to prevent the 400 error
+                responseMimeType: "application/json",
+                // 3. CORRECT nesting and camelCase to disable the reasoning phase
+                thinkingConfig: {
+                    thinkingBudget: 0
+                }
             },
         }),
     });
@@ -24,7 +30,6 @@ async function callGeminiRaw(prompt, temperature = 0.7, maxOutputTokens = 1024) 
         throw new Error(`Gemini error: ${response.status} - ${errorBody}`);
     }
     const data = await response.json();
-    // Extract text safely
     const candidate = (_a = data.candidates) === null || _a === void 0 ? void 0 : _a[0];
     if (!candidate || !candidate.content) {
         throw new Error('No candidates returned from Gemini');

@@ -2,7 +2,8 @@ export async function callGeminiRaw(prompt: string, temperature = 0.7, maxOutput
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('GEMINI_API_KEY not set');
 
-  const url = `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+  // 1. CHANGED to v1beta to support Gemini 2.5 Flash features
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
 
   const response = await fetch(url, {
     method: 'POST',
@@ -12,7 +13,12 @@ export async function callGeminiRaw(prompt: string, temperature = 0.7, maxOutput
       generationConfig: { 
         temperature, 
         maxOutputTokens,
-        // Adding a stop sequence or topP here is often helpful for 2.0 models
+        // 2. CHANGED to camelCase to prevent the 400 error
+        responseMimeType: "application/json",
+        // 3. CORRECT nesting and camelCase to disable the reasoning phase
+        thinkingConfig: {
+          thinkingBudget: 0
+        }
       },
     }),
   });
@@ -24,7 +30,6 @@ export async function callGeminiRaw(prompt: string, temperature = 0.7, maxOutput
 
   const data = await response.json();
   
-  // Extract text safely
   const candidate = data.candidates?.[0];
   if (!candidate || !candidate.content) {
     throw new Error('No candidates returned from Gemini');

@@ -10,11 +10,11 @@ import { ForecastChartSkeleton } from '@/src/components/Skeletons';
 import { computeSwellQuality } from '@/src/services/swellQuality';
 import { ForecastStrip } from '@/src/components/ForecastStrip';
 import { TideMiniChart } from '@/src/components/TideMiniChart';
-import { getGeminiInsight } from '@/src/services/geminiInsight';
+import { getGeminiInsight, getHeroInsight } from '@/src/services/geminiInsight';
 import * as SunCalc from 'suncalc';
 import { useUnits } from '@/src/hooks/useUnits';
 import type { GeminiInsight } from '@/types';
-import { getGeminiCache, setGeminiCache, buildHomeCacheKey } from '@/src/utils/geminiCache';
+import { getGeminiCache, setGeminiCache } from '@/src/utils/geminiCache';
 
 interface HomeScreenProps {
   onNavigate: (screen: Screen, params?: any) => void;
@@ -28,6 +28,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
   const [showSpotPicker, setShowSpotPicker] = useState(!homeSpotId);
   const [insight, setInsight] = useState<GeminiInsight | null>(null);
   const [loadingInsight, setLoadingInsight] = useState(false);
+  const [heroSummary, setHeroSummary] = useState<string>('');
+  const [loadingHero, setLoadingHero] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
 
@@ -48,7 +50,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
 
   useEffect(() => {
     if (homeSpotId && homeForecast && !isGuest && homeSpot && user) {
-      const cacheKey = buildHomeCacheKey(homeSpotId);
+      const cacheKey = `home_personal_${homeSpotId}_${new Date().toISOString().slice(0, 10)}`;
       
       const fetchWithCache = async () => {
         setLoadingInsight(true);
@@ -83,6 +85,34 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
       fetchWithCache();
     }
   }, [homeSpotId, homeForecast, isGuest, sessions, preferredWaveHeight, homeSpot, user, quiver, forecastFetchedAt]);
+
+  useEffect(() => {
+    if (homeSpotId && homeForecast && homeForecast.length > 0 && homeSpot && user && !isGuest) {
+      const today = new Date().toISOString().slice(0, 10);
+      const heroCacheKey = `home_hero_${homeSpotId}_${today}`;
+
+      const fetchHero = async () => {
+        setLoadingHero(true);
+        const cached = await getGeminiCache(user.uid, heroCacheKey);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          setHeroSummary(parsed.summary ?? '');
+          setLoadingHero(false);
+          return;
+        }
+        const summary = await getHeroInsight(
+          homeForecast,
+          homeSpot.name,
+          { lat: homeSpot.latitude, lng: homeSpot.longitude }
+        );
+        await setGeminiCache(user.uid, heroCacheKey, JSON.stringify({ summary }));
+        setHeroSummary(summary);
+        setLoadingHero(false);
+      };
+
+      fetchHero();
+    }
+  }, [homeSpotId, homeForecast, homeSpot, user, isGuest]);
 
   const handleSpotSelect = async (spotId: string) => {
     setHomeSpotId(spotId);
@@ -265,9 +295,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
 
                   {/* AI summary text */}
                   <p className="text-sm opacity-70 leading-relaxed">
-                    {loadingInsight
-                      ? 'Analyzing conditions...'
-                      : insight?.summary || `${qualityScore?.label || 'Fair'} conditions. Tap for the full forecast.`}
+                    {loadingHero
+                      ? 'Reading live conditions...'
+                      : heroSummary || `${qualityScore?.label || 'Fair'} conditions. Tap for the full forecast.`}
                   </p>
 
                   {/* Bottom CTA row */}
@@ -322,7 +352,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
                   ) : (
                     <>
                       <h4 className="font-bold text-primary mb-1">{insight?.bestWindows?.[0]?.startTime ? `Best time: ${new Date(insight.bestWindows[0].startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'No ideal window found yet'}</h4>
-                      <p className="text-sm leading-relaxed text-slate-400">{insight?.summary || 'Log more sessions to get personalized matching.'}</p>
+                      <p className="text-sm leading-relaxed text-slate-400">
+                        {insight?.bestWindows?.[0]?.reason || insight?.summary || 'Log more sessions to get personalized matching.'}
+                      </p>
                     </>
                   )}
                   <p className="text-xs text-slate-500 mt-2 italic">Powered by Gemini</p>
