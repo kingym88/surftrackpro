@@ -84,6 +84,16 @@ exports.callGemini = (0, https_1.onRequest)({
             temperature = 0.5;
             maxOutputTokens = 256;
             break;
+        case 'HERO_SNAP':
+            prompt = buildHeroSnapPrompt(payload);
+            temperature = 0.6;
+            maxOutputTokens = 256;
+            break;
+        case 'SPOT_ANALYSIS_DEEP':
+            prompt = buildSpotAnalysisDeepPrompt(payload);
+            temperature = 0.7;
+            maxOutputTokens = 1024;
+            break;
         default:
             res.status(400).json({ error: `Unknown type: ${type}` });
             return;
@@ -130,7 +140,7 @@ You MUST respond with ONLY a raw JSON object. No markdown. No code fences. No ba
   "bestWindows": [
     {"startTime": "ISO8601_datetime", "endTime": "ISO8601_datetime", "reason": "2-3 sentence explanation in plain surfer language"}
   ],
-  "summary": "2-3 sentence overall forecast summary for this spot this week, in plain surfer language"
+  "summary": "2-3 sentence personalised recommendation that explicitly references the surfer's session history patterns, tide preference, and wave height preference — not a generic forecast summary. Mention specific data from their history."
 }`;
 }
 function buildSurfMatchPrompt(p) {
@@ -183,12 +193,55 @@ RECENT SESSIONS (most recent first):
 ${p.sessionSummary}
 
 COMPUTED TREND: ${p.trend}
+${p.tidePatternText ? `TIDE PATTERN: ${p.tidePatternText}` : ''}
 
 Give a 3–4 sentence coaching analysis. Be specific — reference actual session data (dates, wave heights, boards used).
 Identify one clear strength and one actionable area to improve. End with a motivating but realistic next goal.
 Use plain surfer language — honest, direct, not patronising.
 
 Respond ONLY with valid JSON: { "analysis": "your coaching analysis here" }`;
+}
+function buildHeroSnapPrompt(p) {
+    return `You are a surf reporter giving a live conditions update.
+
+CURRENT CONDITIONS AT ${p.spotName}:
+${p.currentSnap}
+
+NEXT 6 HOURS:
+${p.next6h}
+
+Write 1-2 sentences (max 40 words) summarising right-now conditions and whether they will hold or change. Sound like a local surfer — casual and direct. No jargon.
+
+Respond ONLY with valid JSON: { "summary": "your one sentence here" }`;
+}
+function buildSpotAnalysisDeepPrompt(p) {
+    var _a;
+    return `You are an expert surf coach and meteorologist analysing ${p.spotName}.
+
+BREAK CHARACTER:
+- Type: ${p.breakType} | Facing: ${p.facingDirection}
+- Works best: swell from ${p.optimalSwellDirection}, wind from ${p.optimalWindDirection}, tide: ${p.optimalTidePhase}
+
+SURFER PROFILE:
+${p.wavePreference}
+${(_a = p.detectedPatternsText) !== null && _a !== void 0 ? _a : ''}
+
+7-DAY DAYLIGHT FORECAST:
+${p.forecastSummary}
+
+TASK: Identify the 2–3 best surf windows specific to THIS break's character. For each window, explain WHY it suits this specific break — reference the break type, facing direction, and optimal conditions in every reason. Do NOT give generic advice.
+
+Respond ONLY with valid JSON:
+{
+  "bestWindows": [
+    {
+      "startTime": "ISO8601_datetime",
+      "endTime": "ISO8601_datetime",
+      "reason": "2-3 sentences referencing this break's specific character and why this window suits it"
+    }
+  ],
+  "summary": "2-3 sentence spot-specific weekly outlook that references this break's personality and character — not a generic forecast"
+}`;
 }
 function buildSwellAlertPrompt(p) {
     return `You are a surf coach. Based on this 24-hour forecast for a surfer's home break,
